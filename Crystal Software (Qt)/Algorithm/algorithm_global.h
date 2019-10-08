@@ -2,6 +2,8 @@
 
 #include <QtCore/qglobal.h>
 
+#include <QObject>
+
 #ifndef BUILD_STATIC
 # if defined(ALGORITHM_LIB)
 #  define ALGORITHM_EXPORT Q_DECL_EXPORT

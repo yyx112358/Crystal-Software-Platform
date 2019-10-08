@@ -10,7 +10,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Crystal Software", "Crystal
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Algorithm", "Algorithm\Algorithm.vcxproj", "{1EA28E3F-40A1-4A25-AC77-62980F8D5C5D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestAnything", "TestAnything\TestAnything.vcxproj", "{7A08B42E-851D-43A8-81A7-A0E354431A5C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestAnything", "TestAnything\TestAnything.vcxproj", "{07D21040-C90B-4830-AE3F-AF2D24066937}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,12 +32,12 @@ Global
 		{1EA28E3F-40A1-4A25-AC77-62980F8D5C5D}.Release|x64.ActiveCfg = Release|x64
 		{1EA28E3F-40A1-4A25-AC77-62980F8D5C5D}.Release|x64.Build.0 = Release|x64
 		{1EA28E3F-40A1-4A25-AC77-62980F8D5C5D}.Release|x86.ActiveCfg = Release|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Debug|x64.ActiveCfg = Debug|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Debug|x64.Build.0 = Debug|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Debug|x86.ActiveCfg = Debug|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Release|x64.ActiveCfg = Release|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Release|x64.Build.0 = Release|x64
-		{7A08B42E-851D-43A8-81A7-A0E354431A5C}.Release|x86.ActiveCfg = Release|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Debug|x64.ActiveCfg = Debug|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Debug|x64.Build.0 = Debug|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Debug|x86.ActiveCfg = Debug|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x64.ActiveCfg = Release|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x64.Build.0 = Release|x64
+		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

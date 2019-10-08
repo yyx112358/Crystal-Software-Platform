@@ -47,7 +47,4 @@
       <Filter>Resource Files</Filter>
     </QtRcc>
   </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="TestAnything.rc" />
-  </ItemGroup>
 </Project>

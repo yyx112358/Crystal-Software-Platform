@@ -1,3 +1,3 @@
 #pragma once
 
-#include <QObject>
+#include "algorithm_global.h"
