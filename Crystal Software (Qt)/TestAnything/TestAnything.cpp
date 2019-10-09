@@ -15,26 +15,30 @@ TestAnything::TestAnything(QWidget *parent)
 
 	nodes.append(new AlgGraphNode(this, *new QThreadPool(this)));
 	nodes.append(new AlgGraphNode(this, *new QThreadPool(this)));
-	nodes[0]->Init();
-	nodes[1]->Init();
+	nodes[0]->Init("in1","in1",true);
+	nodes[0]->Init("out1", "out1", false);
+	nodes[1]->Init("in1", "in1", true);
+	nodes[1]->Init("out1", "out1", false);
 	Connect(*nodes[0], "out1", *nodes[1], "in1");
 	connect(nodes[1], &AlgGraphNode::sig_Output, this, [this](QVariant var)
 	{
 		ui.label->setText(var.toString());
 	});
+	
 }
 
 
 
 void TestAnything::slot_Start(bool b)
 {
+	qDebug() << std::is_standard_layout<VertexInfo>::value;
 // 	qDebug() << __FUNCSIG__;
 // 	ui.plainTextEdit->setPlainText(ui.plainTextEdit->toPlainText()+__FUNCSIG__"\n");
 // 	//QtConcurrent::run()
 // 
 	for(auto node:nodes)
 		node->Activate();
-	nodes[0]->Activate(ui.plainTextEdit->toPlainText(), &nodes[0]->_inputVertex["in1"]);
+	nodes[0]->Activate(ui.plainTextEdit->toPlainText(), "in1");
 }
 
 void AlgGraphNode::Run(/*QMap<QString,QVariant>*/)

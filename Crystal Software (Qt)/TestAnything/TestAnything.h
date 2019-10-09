@@ -54,6 +54,7 @@ public:
 	bool isActivated = false;
 	bool isEnabled = true;
 
+	//TODO:一些方便用的函数和转移语义
 	//VertexInfo&operator=(VertexInfo&&);
 	void Reset();
 	void Release();
@@ -70,14 +71,17 @@ public:
 		sizeof(VertexInfo);
 		connect(&_result, &QFutureWatcher<void>::finished, this, &AlgGraphNode::Output);
 	}
-	void Init()
+	void AddVertex(QString name,QVariant defaultValue,bool isInput)
 	{
-		VertexInfo in1, out1;
-		in1.defaultValue = "in1";
-		out1.defaultValue = "out1";
-		_inputVertex.insert("in1", in1);
-		_outputVertex.insert("out1", out1);
+		assert(name.isEmpty() == false);
+		VertexInfo vtx;
+		vtx.defaultValue = defaultValue;
+		if (isInput)
+			_inputVertex.insert(name, vtx);
+		else
+			_outputVertex.insert(name, vtx);
 	}
+	void AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
 	void Reset()
 	{
 		for (auto &v : _inputVertex)
@@ -96,12 +100,20 @@ public:
 	{
 		//TODO:合法性检查
 		assert(srcNode._outputVertex.contains(srcVertexName) && dstNode._inputVertex.contains(dstVertexName));
-		connect(&srcNode, &AlgGraphNode::sig_Activate, &dstNode, &AlgGraphNode::Activate);
+		void (AlgGraphNode::*pActivate)(QVariant, VertexInfo*, bool)=&AlgGraphNode::Activate;//注意这里要这样写来区分重载函数
+		connect(&srcNode, &AlgGraphNode::sig_Activate, &dstNode, pActivate);
 		VertexInfo&srcV = srcNode._outputVertex[srcVertexName], &dstV = dstNode._inputVertex[dstVertexName];
 		srcV.connectedVertexs.append(&dstV);
 		dstV.connectedVertexs.append(&srcV);
 	}
-	void Activate(QVariant var=QVariant(),VertexInfo*vtx = nullptr, bool b = true)
+	void Activate(QVariant var = QVariant(), QString vtxName = QString(), bool b = true)
+	{
+		if(vtxName.isEmpty()==false)
+			Activate(var, &_inputVertex[vtxName], b);
+		else
+			Activate(var, nullptr, b);
+	}
+	void Activate(QVariant var,VertexInfo*vtx = nullptr, bool b = true)
 	{
 		//TODO:需要加锁
 		if (vtx != nullptr)
@@ -137,7 +149,7 @@ public:
 		{
 			for (auto cv : v.connectedVertexs)
 				emit sig_Activate(v.param, cv, true);
-			emit sig_Output(v.param);
+			emit sig_Output(v.param,&v);
 			v.param.clear();
 		}
 		emit sig_OutputFinished();
@@ -145,25 +157,24 @@ public:
 	void Pause();
 	void Stop();
 
-	void GetVertexInfo()const;
+	QStringList GetVertexNames()const;
+	const VertexInfo* GetVertexInfo()const;
 	void Create();
 
 signals:
 	void sig_Activate(QVariant var = QVariant(), VertexInfo*vtx = nullptr, bool b = true);
 	void sig_VertexActivated();
 	void sig_NodeActivated();
-	void sig_Output(QVariant var = QVariant()/*, VertexInfo*vtx = nullptr, bool b = true*/);
+	void sig_Output(QVariant var = QVariant(), VertexInfo*srcVertex = nullptr/*, bool b = true*/);
 	void sig_OutputFinished();
 
 	void sig_ReportProgress(float);
 	void sig_ResultReady();
-#ifndef _DEBUG
 protected:
-#endif // _DEBUG
 	bool _enable = true;
 	QFutureWatcher<void>_result;
-	QMap<QString, VertexInfo>_inputVertex;
-	QMap<QString, VertexInfo>_outputVertex;
+	QHash<QString, VertexInfo>_inputVertex;
+	QHash<QString, VertexInfo>_outputVertex;
 
 	QThreadPool&_pool;
 };
