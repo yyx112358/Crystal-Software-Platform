@@ -19,9 +19,12 @@
 #include <QVariant>
 #include <QDebug>
 #include <QTime>
+#include <QGraphicsItem>
 
 class VertexInfo;
 class AlgGraphNode;
+class GuiGraphNode;
+class GraphNode;
 
 class TestAnything : public QMainWindow
 {
@@ -63,131 +66,154 @@ public:
 	//virtual bool _AssertFunction(QVariant var);
 };
 
-//TODO:派生：基本算法、常量、外部输入、外部输出、条件、while、逻辑运算、延时、循环、缓冲
+//TODO:派生：基本算法、常量、外部输入、外部输出、函数、条件、while、逻辑运算、延时、循环、缓冲
 class AlgGraphNode
 	:public QObject//, public Interface_Alg
 {
 	Q_OBJECT
+
 public:
-	AlgGraphNode(QObject*parent, QThreadPool&pool) :QObject(parent), _pool(pool) 
-	{
-		sizeof(VertexInfo);
-		connect(&_result, &QFutureWatcher<void>::finished, this, &AlgGraphNode::Output);
-	}
-	void AddVertex(QString name,QVariant defaultValue,bool isInput)
-	{
-		assert(name.isEmpty() == false);
-		VertexInfo vtx;
-		vtx.defaultValue = defaultValue;
-		if (isInput)
-			_inputVertex.insert(name, vtx);
-		else
-			_outputVertex.insert(name, vtx);
-	}
+
+	AlgGraphNode(QObject*parent, QThreadPool&pool);
+	virtual ~AlgGraphNode();
+
+	void AddVertex(QString name,QVariant defaultValue,bool isInput);
 	void AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
-	void Reset()
-	{
-		for (auto &v : _inputVertex)
-		{
-			v.isActivated = false;
-			v.isEnabled = true;
-			v.param.clear();
-		}
-		for (auto &v : _outputVertex)
-		{
-			v.isActivated = false;
-			v.isEnabled = true;
-			v.param.clear();
-		}
-	}
-	void Release();
-	friend void Connect(AlgGraphNode&srcNode,QString srcVertexName,AlgGraphNode&dstNode,QString dstVertexName)
+	void RemoveVertex(QString name);
+	void RemoveVertex(QStringList names);
+	friend void ConnectVertex(AlgGraphNode&srcNode, QString srcVertexName, AlgGraphNode&dstNode, QString dstVertexName)
 	{
 		//TODO:合法性检查
 		assert(srcNode._outputVertex.contains(srcVertexName) && dstNode._inputVertex.contains(dstVertexName));
-		void (AlgGraphNode::*pActivate)(QVariant, VertexInfo*, bool)=&AlgGraphNode::Activate;//注意这里要这样写来区分重载函数
+		void (AlgGraphNode::*pActivate)(QVariant, VertexInfo*, bool) = &AlgGraphNode::Activate;//注意这里要这样写来区分重载函数
 		connect(&srcNode, &AlgGraphNode::sig_Activate, &dstNode, pActivate);
 		VertexInfo&srcV = srcNode._outputVertex[srcVertexName], &dstV = dstNode._inputVertex[dstVertexName];
 		srcV.connectedVertexs.append(&dstV);
 		dstV.connectedVertexs.append(&srcV);
 	}
-	void Activate(QVariant var = QVariant(), QString vtxName = QString(), bool b = true)
-	{
-		if(vtxName.isEmpty()==false)
-			Activate(var, &_inputVertex[vtxName], b);
-		else
-			Activate(var, nullptr, b);
-	}
-	void Activate(QVariant var,VertexInfo*vtx = nullptr, bool b = true)
-	{
-		//TODO:需要加锁
-		if (vtx != nullptr)
-		{
-			if (vtx->isEnabled == false)//禁用顶点，阻塞
-				return;
-			//TODO:类型判断
-			vtx->param = var;
-			vtx->isActivated = b;
-			emit sig_VertexActivated(b);
-		}
-		if (_result.isRunning() == false)//运行期间，阻塞输入
-		{
-			for (auto const &v : _inputVertex)//检查是否全部激活
-			{
-				if (v.isActivated == false)
-					return;
-			}
-			//TODO:读取输入
-			emit sig_NodeActivated();
-			//TODO:暂停和退出
-			_result.setFuture(QtConcurrent::run(&_pool, this, &AlgGraphNode::Run));
-			//TODO:暂停和退出
-			//emit sig_ResultReady();
-		}
-	}
-	void Run(/*QMap<QString,QVariant>*/)
-	{
-		_Run();
-	}
 
-	void Output()
-	{
-		//TODO:加锁
-		//qDebug() << "====Output====:" << QThread::currentThread();
-		for (auto &v : _outputVertex)
-		{
-			for (auto cv : v.connectedVertexs)
-				emit sig_Activate(v.param, cv, true);
-			emit sig_Output(v.param,&v);
-			v.param.clear();
-		}
-		emit sig_OutputFinished();
-	}
+	void Reset();
+	void Release();	
+
+	void Activate(QVariant var = QVariant(), QString vtxName = QString(), bool b = true);
+	void Activate(QVariant var,VertexInfo*vtx = nullptr, bool b = true);
+	void Run(/*QMap<QString,QVariant>*/);
+	void Output();
+
 	void Pause();
 	void Stop();
 
 	QStringList GetVertexNames()const;
 	const VertexInfo* GetVertexInfo()const;
-	void Create();
-	QString name;
+	QVariant GetVertexParam(QString vtxName, bool isInput)const { return isInput ? _inputVertex[vtxName].param : _outputVertex[vtxName].param; }
 
+	//static AlgGraphNode* Create();
 signals:
+	void sig_VertexAdded(const VertexInfo*vtx,bool isInput);
+	void sig_ConnectionAdded();
+
 	void sig_Activate(QVariant var = QVariant(), VertexInfo*vtx = nullptr, bool b = true);
 	void sig_VertexActivated(bool);
-	void sig_NodeActivated();
+	void sig_NodeActivated(const AlgGraphNode*node);
+	void sig_TaskFinished(const AlgGraphNode*node);
 	void sig_Output(QVariant var = QVariant(), VertexInfo*srcVertex = nullptr/*, bool b = true*/);
 	void sig_OutputFinished();
 
 	void sig_ReportProgress(float);
 	void sig_ResultReady();
 protected:
+	virtual void _LoadInput(){}
 	virtual void _Run();
+	virtual void _LoadOutput(){}
 
-	bool _enable = true;
+	//bool _enable = true;
 	
 	QFutureWatcher<void>_result;
 	QHash<QString, VertexInfo>_inputVertex;
 	QHash<QString, VertexInfo>_outputVertex;
 
 	QThreadPool&_pool;
+};
+
+class GuiGraphNode
+	:public QObject
+{	
+	Q_OBJECT
+public:
+	GuiGraphNode(const AlgGraphNode*algnode,qreal x,qreal y,qreal width,qreal height,QObject*parent)
+		:QObject(parent),guiItems(nullptr),_algnode(algnode)
+	{
+		connect(_algnode, &AlgGraphNode::destroyed, this, &QObject::deleteLater);
+		
+		Init(QRectF(x,y,width,height));
+		guiItems.setFlag(QGraphicsItem::ItemIsMovable);
+	}
+	virtual ~GuiGraphNode()
+	{
+		qDebug() << __FUNCSIG__;
+	}
+	virtual void Init(QRectF area)
+	{
+		//guiItems.setPos(area.topLeft());
+		border = new QGraphicsRectItem(area, nullptr);
+		border->setTransformOriginPoint(border->boundingRect().center());
+		guiItems.addToGroup(border);
+		title = new QGraphicsTextItem(_algnode->objectName(), border);
+		title->setPos(border->boundingRect().center());
+		title->setTransformOriginPoint(border->boundingRect().center());
+		guiItems.addToGroup(title);	
+		qDebug() << guiItems.pos() << border->pos() << title->pos();
+		
+		connect(_algnode, &AlgGraphNode::sig_NodeActivated, this, [this]
+		{
+			auto p = border->pos();
+			//border->setPos(0, 0);
+			border->setScale(1.25);
+			title->setPos(border->boundingRect().center());
+			//border->setPos(p);
+		});
+		connect(_algnode, &AlgGraphNode::sig_TaskFinished, this, [this]
+		{
+			auto p = border->pos();
+			//border->setPos(0, 0);
+			border->setScale(1/1.25);
+			title->setPos(border->boundingRect().center());
+			//border->setPos(p);
+		});
+		connect(_algnode, &AlgGraphNode::sig_Output, this, [this](QVariant var)
+		{
+			title->setPlainText(var.toString());
+		});
+	}
+	QGraphicsItemGroup guiItems;
+	QGraphicsItem*border;
+	QGraphicsTextItem*title;
+	QList<QGraphicsItem*>inputs, outputs;
+
+	const AlgGraphNode*_algnode;
+};
+
+class GraphScene
+	:public QObject
+{
+	Q_OBJECT
+public:
+	GraphScene(QObject*parent)
+		:QObject(parent)
+	{}
+
+	void AddNode(const AlgGraphNode*node, qreal x, qreal y, qreal width, qreal height)
+	{
+		nodes[node] = new GuiGraphNode(node, x, y, width, height,this);
+		connect(node, &QObject::destroyed, this, [this](QObject*obj)
+		{
+			nodes.remove(qobject_cast<const AlgGraphNode*> (obj));
+		});
+		scene.addItem(&nodes[node]->guiItems);
+	}
+	void AddConnection(const AlgGraphNode*srcNode,const QString srcVertexName,
+		const AlgGraphNode*dstNode, const QString dstVertexName);
+
+	QHash<const AlgGraphNode*, GuiGraphNode*>nodes;
+	QGraphicsScene scene;
 };
