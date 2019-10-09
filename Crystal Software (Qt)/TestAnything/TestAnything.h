@@ -32,7 +32,8 @@ public:
 
 	void slot_Start(bool b);
 
-	QList<AlgGraphNode*>nodes;
+	QHash<QString,AlgGraphNode*>nodes;
+	QThreadPool pool;
 private:
 	Ui::TestAnythingClass ui;
 };
@@ -44,10 +45,10 @@ public:
 	QVariant param;
 	QVariant defaultValue;
 	
-	//QMap<QString, QVariant>additionInfo;
+	QMap<QString, QVariant>additionInfo;
 	//QString name;
 	//QString description;
-	//std::function<bool(VertexInfo&)>assertFunction;
+	std::function<bool(const VertexInfo&)>*assertFunction;
 
 	QList<VertexInfo*>connectedVertexs;
 
@@ -58,6 +59,8 @@ public:
 	//VertexInfo&operator=(VertexInfo&&);
 	void Reset();
 	void Release();
+	void Load(QVariant var);
+	//virtual bool _AssertFunction(QVariant var);
 };
 
 //TODO:派生：基本算法、常量、外部输入、外部输出、条件、while、逻辑运算、延时、循环、缓冲
@@ -88,11 +91,13 @@ public:
 		{
 			v.isActivated = false;
 			v.isEnabled = true;
+			v.param.clear();
 		}
 		for (auto &v : _outputVertex)
 		{
 			v.isActivated = false;
 			v.isEnabled = true;
+			v.param.clear();
 		}
 	}
 	void Release();
@@ -123,7 +128,7 @@ public:
 			//TODO:类型判断
 			vtx->param = var;
 			vtx->isActivated = b;
-			emit sig_VertexActivated();
+			emit sig_VertexActivated(b);
 		}
 		if (_result.isRunning() == false)//运行期间，阻塞输入
 		{
@@ -140,11 +145,15 @@ public:
 			//emit sig_ResultReady();
 		}
 	}
-	void Run(/*QMap<QString,QVariant>*/);
+	void Run(/*QMap<QString,QVariant>*/)
+	{
+		_Run();
+	}
+
 	void Output()
 	{
 		//TODO:加锁
-		qDebug() << "====Output====:" << QThread::currentThread();
+		//qDebug() << "====Output====:" << QThread::currentThread();
 		for (auto &v : _outputVertex)
 		{
 			for (auto cv : v.connectedVertexs)
@@ -160,10 +169,11 @@ public:
 	QStringList GetVertexNames()const;
 	const VertexInfo* GetVertexInfo()const;
 	void Create();
+	QString name;
 
 signals:
 	void sig_Activate(QVariant var = QVariant(), VertexInfo*vtx = nullptr, bool b = true);
-	void sig_VertexActivated();
+	void sig_VertexActivated(bool);
 	void sig_NodeActivated();
 	void sig_Output(QVariant var = QVariant(), VertexInfo*srcVertex = nullptr/*, bool b = true*/);
 	void sig_OutputFinished();
@@ -171,7 +181,10 @@ signals:
 	void sig_ReportProgress(float);
 	void sig_ResultReady();
 protected:
+	virtual void _Run();
+
 	bool _enable = true;
+	
 	QFutureWatcher<void>_result;
 	QHash<QString, VertexInfo>_inputVertex;
 	QHash<QString, VertexInfo>_outputVertex;
