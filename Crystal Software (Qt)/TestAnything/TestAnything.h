@@ -134,7 +134,7 @@ protected:
 
 	QThreadPool&_pool;
 };
-
+//TODO:扩展：不同行为
 class GuiGraphNode
 	:public QObject
 {	
@@ -146,7 +146,7 @@ public:
 		connect(_algnode, &AlgGraphNode::destroyed, this, &QObject::deleteLater);
 		
 		Init(QRectF(x,y,width,height));
-		guiItems.setFlag(QGraphicsItem::ItemIsMovable);
+		
 	}
 	virtual ~GuiGraphNode()
 	{
@@ -154,38 +154,33 @@ public:
 	}
 	virtual void Init(QRectF area)
 	{
-		//guiItems.setPos(area.topLeft());
-		border = new QGraphicsRectItem(area, nullptr);
-		border->setTransformOriginPoint(border->boundingRect().center());
-		guiItems.addToGroup(border);
-		title = new QGraphicsTextItem(_algnode->objectName(), border);
+		guiItems = new QGraphicsItemGroup(nullptr);
+		guiItems->setFlag(QGraphicsItem::ItemIsMovable);
+		border = new QGraphicsRectItem(area, guiItems);
+		border->setTransformOriginPoint(border->boundingRect().center());//不加这一句那就是从原点开始缩放
+		guiItems->addToGroup(border);
+		title = new QGraphicsTextItem(_algnode->objectName(), guiItems);
 		title->setPos(border->boundingRect().center());
 		title->setTransformOriginPoint(border->boundingRect().center());
-		guiItems.addToGroup(title);	
-		qDebug() << guiItems.pos() << border->pos() << title->pos();
+		guiItems->addToGroup(title);	
+		qDebug() << guiItems->pos() << border->pos() << title->pos();
 		
 		connect(_algnode, &AlgGraphNode::sig_NodeActivated, this, [this]
 		{
-			auto p = border->pos();
-			//border->setPos(0, 0);
 			border->setScale(1.25);
 			title->setPos(border->boundingRect().center());
-			//border->setPos(p);
 		});
 		connect(_algnode, &AlgGraphNode::sig_TaskFinished, this, [this]
 		{
-			auto p = border->pos();
-			//border->setPos(0, 0);
 			border->setScale(1/1.25);
 			title->setPos(border->boundingRect().center());
-			//border->setPos(p);
 		});
 		connect(_algnode, &AlgGraphNode::sig_Output, this, [this](QVariant var)
 		{
 			title->setPlainText(var.toString());
 		});
 	}
-	QGraphicsItemGroup guiItems;
+	QGraphicsItemGroup *guiItems;
 	QGraphicsItem*border;
 	QGraphicsTextItem*title;
 	QList<QGraphicsItem*>inputs, outputs;
@@ -209,7 +204,7 @@ public:
 		{
 			nodes.remove(qobject_cast<const AlgGraphNode*> (obj));
 		});
-		scene.addItem(&nodes[node]->guiItems);
+		scene.addItem(nodes[node]->guiItems);
 	}
 	void AddConnection(const AlgGraphNode*srcNode,const QString srcVertexName,
 		const AlgGraphNode*dstNode, const QString dstVertexName);

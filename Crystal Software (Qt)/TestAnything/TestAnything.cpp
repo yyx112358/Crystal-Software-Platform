@@ -94,7 +94,7 @@ AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool) :QObject(parent), _
 
 AlgGraphNode::~AlgGraphNode()
 {
-
+	qDebug() << __FUNCSIG__;
 }
 
 void AlgGraphNode::AddVertex(QString name, QVariant defaultValue, bool isInput)
