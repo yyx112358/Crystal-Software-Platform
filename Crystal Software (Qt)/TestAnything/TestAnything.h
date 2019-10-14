@@ -20,27 +20,222 @@
 #include <QDebug>
 #include <QTime>
 #include <QGraphicsItem>
+#include <atomic>
 
-class VertexInfo;
+class AlgGraphVertex;
 class AlgGraphNode;
+
+class GuiGraphVertex;
 class GuiGraphNode;
-class GraphNode;
+
+class GraphScene;
+class GraphController;
+class GraphError;
+class GraphWarning;
+
+class TestAnything;
+
+class AlgGraphNode
+	:public QObject
+{
+	Q_OBJECT
+public:
+	AlgGraphNode(QObject*parent, QThreadPool&pool) :QObject(parent), _pool(pool) {}
+	virtual ~AlgGraphNode() {}
+
+	void Init();
+	void Reset();
+	void Release();
+
+	virtual void AddVertex(QString name, QVariant defaultValue, bool isInput);
+	virtual void AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
+	virtual void RemoveVertex(QString name);
+	virtual void RemoveVertex(QStringList names);
+	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
+	virtual void DisconnectVertex(QString vertexName);
+	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
+
+	virtual void Write();
+	virtual void Read();
+
+	void Activate();
+	void Run(/*QMap<QString, QVariant>*/);
+	void Output();
+	void Pause();
+	void Stop();
+
+signals:
+	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
+	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
+	void sig_ConnectionAdded();
+	void sig_ConnectionRemoved();
+
+	void sig_VertexActivated(bool);
+	void sig_NodeActivated();
+	void sig_RunFinished();
+	void sig_OutputFinished();
+protected:
+	QHash<QString, AlgGraphVertex>_inputVertex;//输入节点
+	QHash<QString, AlgGraphVertex>_outputVertex;//输出节点
+
+	QFutureWatcher<void> _result;//程序运行观测器
+	QThreadPool&_pool;//使用的线程池
+	QReadWriteLock _lock;//锁【可能并不需要，因为读写参数都发生在主线程】
+
+	std::atomic_bool _isEnable = true;//使能
+	std::atomic_bool _unchange = false;//不可在创建后修改
+	std::atomic_bool _pause = false;//暂停标志
+	std::atomic_bool _stop = false;//结束标志
+
+	GuiGraphNode* _gui = nullptr;
+};
+
+class AlgGraphNode_Input
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Input(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent,pool) {}
+};
+
+class AlgGraphNode_Output
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Output(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {}
+};
+
+class AlgGraphVertex
+	:public QObject
+{
+	Q_OBJECT
+public:
+	AlgGraphVertex(AlgGraphNode&parent) :QObject(&parent), node(parent) {  }
+	virtual ~AlgGraphVertex(){}
+
+	virtual void Activate(QVariant var, bool b = true);
+	virtual void Connect(AlgGraphVertex*another);
+	virtual void Write();
+	virtual void Read();
+
+	QVariant data;//数据
+	QVariant defaultData;//默认值
+ 	QHash<QString, QVariant> additionInfo;//附加信息
+ 
+	QString description;//描述
+	QList<std::function<bool(const QVariant&)>> assertFunctions;//输入校验
+
+	AlgGraphNode& node;//从属的节点
+	QList<AlgGraphVertex*> connectedVertexes;//连接到的端口
+
+	std::atomic_bool is_Activated = false;//激活标志
+	std::atomic_bool is_Enabled = true;//使能标志
+
+	GuiGraphVertex*gui = nullptr;
+signals:
+	void sig_ActivateBegin();
+	void sig_ActivateEnd();
+};
+class AlgGraphVertex_Input
+	:public AlgGraphVertex
+{
+	Q_OBJECT
+public:
+	enum class Behavior :unsigned char
+	{
+		KEEP = 0,//一直保持激活状态和数据（默认）
+		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失
+		//BUFFER = 2,//缓冲，缓冲输入数据
+	};
+};
+class AlgGraphVertex_Output
+	:public AlgGraphVertex
+{
+	Q_OBJECT
+public:
+	virtual void Activate(QVariant var, bool isDelay)//isDelay，是否延迟才发送（只存数据不发送）
+	{
+		if (isDelay == true)
+			data = var;
+		else
+		{
+			emit sig_ActivateBegin();
+
+			emit sig_Activate(var, true);
+			var.clear();
+
+			emit sig_ActivateEnd();
+		}
+	}
+signals:
+	void sig_Activate(QVariant var, bool b);
+};
+
+
+class AlgGraphNode_Function
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+
+};
+
+class GuiGraphVertex
+	:public QGraphicsItem
+{
+public:
+
+protected:
+};
+class GuiGraphArrow
+	:public QGraphicsItem
+{
+public:
+	virtual QRectF boundingRect(void) const { throw "Not Implement!"; }
+	virtual void paint(QPainter *, const QStyleOptionGraphicsItem *, QWidget *) { throw "Not Implement!"; }
+protected:
+};
+class GuiGraphNode
+	:public QObject
+{
+	Q_OBJECT
+public:
+
+protected:
+	QGraphicsItem*_item;
+
+	QHash<QString, GuiGraphVertex*>_inputVertex;//输入节点
+	QHash<QString, GuiGraphVertex*>_outputVertex;//输出节点
+	QHash<QString, QWidget*>_panels;//面板控件
+};
+
+
 
 class TestAnything : public QMainWindow
 {
 	Q_OBJECT
-
+	friend class GraphController;  
 public:
 	TestAnything(QWidget *parent = Q_NULLPTR);
 
+	void AddNode(const AlgGraphNode*node, QPointF center);
+
 	void slot_Start(bool b);
 
-	QHash<QString,AlgGraphNode*>nodes;
-	QThreadPool pool;
+	GraphController *controller;
+	//QHash<QString,AlgGraphNode*>nodes;	
 private:
 	Ui::TestAnythingClass ui;
+	QGraphicsScene _scene;
+	QList<AlgGraphNode>_nodes;
+	QList<GuiGraphArrow>_arrows;
+
+	QThreadPool _pool;
 };
 
+
+#if 0
 //TODO:InputVertex,OutputVertex,TriggerVertex,EnableVertex
 class VertexInfo
 {
@@ -97,7 +292,7 @@ public:
 
 	void Activate(QVariant var = QVariant(), QString vtxName = QString(), bool b = true);
 	void Activate(QVariant var,VertexInfo*vtx = nullptr, bool b = true);
-	void Run(/*QMap<QString,QVariant>*/);
+	void Run(/ *QMap<QString,QVariant>* /);
 	void Output();
 
 	void Pause();
@@ -116,7 +311,7 @@ signals:
 	void sig_VertexActivated(bool);
 	void sig_NodeActivated(const AlgGraphNode*node);
 	void sig_TaskFinished(const AlgGraphNode*node);
-	void sig_Output(QVariant var = QVariant(), VertexInfo*srcVertex = nullptr/*, bool b = true*/);
+	void sig_Output(QVariant var = QVariant(), VertexInfo*srcVertex = nullptr/ *, bool b = true* /);
 	void sig_OutputFinished();
 
 	void sig_ReportProgress(float);
@@ -212,3 +407,4 @@ public:
 	QHash<const AlgGraphNode*, GuiGraphNode*>nodes;
 	QGraphicsScene scene;
 };
+#endif

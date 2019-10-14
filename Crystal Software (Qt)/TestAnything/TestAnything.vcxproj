@@ -51,7 +51,7 @@
   </ImportGroup>
   <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <QtInstall>msvc2015_64</QtInstall>
-    <QtModules>3dcore 3danimation 3dextras 3dinput 3dlogic 3drender;3dquick;charts;concurrent;core;gui;help;location;multimedia;multimediawidgets;network;opengl;openglextensions;positioning;qml;quick;quickwidgets;quickcontrols2;qmltest;remoteobjects;sql;testlib;uitools;websockets;widgets</QtModules>
+    <QtModules>concurrent;core;gui;widgets</QtModules>
   </PropertyGroup>
   <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <QtInstall>msvc2015_64</QtInstall>

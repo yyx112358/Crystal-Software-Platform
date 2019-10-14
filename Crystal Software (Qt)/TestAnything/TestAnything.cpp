@@ -5,7 +5,35 @@
 #include <functional>
 #include <vld.h>
 using namespace cv;
+TestAnything::TestAnything(QWidget *parent)
+	: QMainWindow(parent),_pool(this),_scene(this)
+{
+	ui.setupUi(this);
+	ui.graphicsView->setScene(&_scene);
+	
+	connect(ui.pushButton_NodeInput, &QPushButton::clicked, this, [this](bool b)
+	{
+		AddNode(new AlgGraphNode_Input(), QPointF(0, 0));
+	});
+	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
+	sizeof(AlgGraphVertex);
+	sizeof(AlgGraphNode);
+	
+}
 
+void TestAnything::AddNode(const AlgGraphNode*node, QPointF center)
+{
+
+}
+
+void TestAnything::slot_Start(bool b)
+{
+	qDebug() << __FUNCSIG__;
+	ui.label->setText("");
+	ui.label_2->setText("");
+}
+
+#if 0
 TestAnything::TestAnything(QWidget *parent)
 	: QMainWindow(parent),pool(this)
 {
@@ -70,6 +98,7 @@ TestAnything::TestAnything(QWidget *parent)
 	});
 }
 
+
 void TestAnything::slot_Start(bool b)
 {
 	qDebug() << __FUNCSIG__;
@@ -129,7 +158,7 @@ void AlgGraphNode::Release()
 	_outputVertex.clear();
 }
 
-void AlgGraphNode::Activate(QVariant var, VertexInfo*vtx /*= nullptr*/, bool b /*= true*/)
+void AlgGraphNode::Activate(QVariant var, VertexInfo*vtx / *= nullptr* /, bool b / *= true* /)
 {
 	//TODO:ÐèÒª¼ÓËø
 	if (vtx != nullptr)
@@ -157,7 +186,7 @@ void AlgGraphNode::Activate(QVariant var, VertexInfo*vtx /*= nullptr*/, bool b /
 	}
 }
 
-void AlgGraphNode::Activate(QVariant var /*= QVariant()*/, QString vtxName /*= QString()*/, bool b /*= true*/)
+void AlgGraphNode::Activate(QVariant var / *= QVariant()* /, QString vtxName / *= QString()* /, bool b / *= true* /)
 {
 	if (vtxName.isEmpty() == false)
 		Activate(var, &_inputVertex[vtxName], b);
@@ -165,7 +194,7 @@ void AlgGraphNode::Activate(QVariant var /*= QVariant()*/, QString vtxName /*= Q
 		Activate(var, nullptr, b);
 }
 
-void AlgGraphNode::Run(/*QMap<QString,QVariant>*/)
+void AlgGraphNode::Run(/ *QMap<QString,QVariant>* /)
 {
 	_Run();
 }
@@ -200,3 +229,5 @@ void AlgGraphNode::_Run()
 		qDebug() << "<out>" << objectName() << ':' << v.param;
  	qDebug() << "End:" << QThread::currentThread() << QTime::currentTime();
 }
+#endif
+
