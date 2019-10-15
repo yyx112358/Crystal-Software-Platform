@@ -28,6 +28,9 @@ TestAnything::TestAnything(QWidget *parent)
 		AddGuiNode(node, QPointF(0, 0));
 	});
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
+	void (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
+	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
+
 	sizeof(AlgGraphVertex); sizeof(AlgGraphVertex_Input); sizeof(GuiGraphNode);sizeof(AlgGraphNode);
 
 	auto nodein = new AlgGraphNode_Input(this, _pool);
@@ -40,7 +43,7 @@ TestAnything::TestAnything(QWidget *parent)
 	_nodes.append(nodeout);
 	AddGuiNode(nodeout, QPointF(200, 0));
 
-	AddConnection(nodein->GetVertexes(false).value("out"), nodeout->GetVertexes(true).value("in"));
+	//AddConnection(nodein->GetVertexes(false).value("out"), nodeout->GetVertexes(true).value("in"));
 }
 
 void TestAnything::AddGuiNode(AlgGraphNode*node, QPointF center)
@@ -68,6 +71,14 @@ void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVer
 	srcItem->AddArrow(arrow);
 	dstItem->AddArrow(arrow);
 	_scene.addItem(arrow);
+}
+
+void TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex)
+{
+	if (srcVertex == nullptr || dstVertex == nullptr)
+		return;
+	qDebug() << srcVertex->_vertex.objectName() << dstVertex->_vertex.objectName();
+	AddConnection(const_cast<AlgGraphVertex*>(&srcVertex->_vertex), const_cast<AlgGraphVertex*>(&dstVertex->_vertex));
 }
 
 void TestAnything::slot_Start(bool b)
@@ -449,13 +460,8 @@ void AlgGraphNode_Output::Init()
 
 QRectF GuiGraphItemVertex::boundingRect() const
 {
-	if (scene() != nullptr)
-	{
-		QFontMetrics fm(scene()->font());
-		return QRectF(0, 0, fm.width(_vertex.objectName()), fm.height());
-	}
-	else
-		return QRectF();
+	QFontMetrics fm(scene() != nullptr ? (scene()->font()) : (QApplication::font()));
+	return QRectF(0, 0, fm.width(_vertex.objectName()), fm.height());
 }
 
 void GuiGraphItemVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
@@ -468,9 +474,9 @@ void GuiGraphItemVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem
 
 void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-	auto item = itemAt(event->scenePos(),QTransform());
 	if (arrow == nullptr) 
-	{		
+	{	
+		auto item = itemAt(event->scenePos(),QTransform());	
 		if (item != nullptr && item->type() == GuiGraphItemVertex::Type/*qgraphicsitem_cast<GuiGraphItemVertex*>(item) == nullptr*/)
 		{
 			auto pos = item->mapToScene(item->boundingRect().center());
@@ -480,13 +486,19 @@ void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 	}
 	else
 	{
-		if (item != nullptr && item->type() == GuiGraphItemVertex::Type)
-		{
-
-		}
+		auto srcPos = arrow->line().p1(),dstPos=arrow->line().p2();
 		removeItem(arrow);
 		delete arrow;
 		arrow = nullptr;
+
+		auto dstItem = itemAt(dstPos, QTransform()),srcItem= itemAt(srcPos, QTransform());//必须先删掉arrow，否则获取的是arrow
+		if (dstItem != nullptr && dstItem->type() == GuiGraphItemVertex::Type)
+		{
+			auto srcItem = itemAt(srcPos, QTransform());
+			if(srcItem!=nullptr && srcItem->type() == GuiGraphItemVertex::Type)
+				emit sig_ConnectionAdded(qgraphicsitem_cast<GuiGraphItemVertex*>(srcItem)
+					, qgraphicsitem_cast<GuiGraphItemVertex*>(dstItem));
+		}
 	}
 
 	QGraphicsScene::mousePressEvent(event);
@@ -509,10 +521,6 @@ void GraphScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 	QGraphicsScene::mouseMoveEvent(event);
 }
 
-void GraphScene::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
-{
-	QGraphicsScene::mouseReleaseEvent(event);
-}
 
 void GuiGraphItemArrow::updatePosition()
 {

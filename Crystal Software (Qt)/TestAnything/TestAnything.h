@@ -241,8 +241,10 @@ public:
 
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
-protected:
+
 	const AlgGraphVertex&_vertex;
+protected:
+
 	int _mouseState = 0;
 	QList<GuiGraphItemArrow*>_arrows;
 
@@ -298,10 +300,11 @@ public:
 	virtual QVariant GetData() { throw "NotImplement"; }
 	virtual void SetData(QVariant var) { throw "NotImplement"; }
 
+	const AlgGraphNode& _node;//对相应AlgGraphNode的常引用，只读不可写
 signals:
 	void sig_ValueChanged();//TODO:后面要下放到相应输入输出子类当中
 protected:
-	const AlgGraphNode& _node;//对相应AlgGraphNode的常引用，只读不可写
+	
 	QHash<QString, const AlgGraphVertex*>_inputVertex;//输入节点
 	QHash<QString, const AlgGraphVertex*>_outputVertex;//输入节点
 
@@ -318,11 +321,10 @@ public:
 	GraphScene(QObject*parent):QGraphicsScene(parent){}
 
 signals:
-
+	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
-	virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
 
 	GuiGraphItemArrow*arrow = nullptr;
 };
@@ -336,6 +338,7 @@ public:
 	void AddNode(QString NodeName);
 	void AddGuiNode(AlgGraphNode*node, QPointF center = QPointF(0, 0));
 	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
+	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
 
 	void slot_Start(bool b);
 
