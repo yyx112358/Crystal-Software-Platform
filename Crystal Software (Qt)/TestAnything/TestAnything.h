@@ -37,9 +37,9 @@ class GraphWarning;
 
 class TestAnything;
 
-const bool VTXIN = true;
-const bool VTXOUT = false;
 
+#pragma region AlgGraphVertex
+//Alg的Vertex，主要负责数据存储、传递、激活的工作
 class AlgGraphVertex
 	:public QObject
 {
@@ -49,11 +49,46 @@ public:
 		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {setObjectName(name);}
 	virtual ~AlgGraphVertex() {}
 
-	virtual void Activate(QVariant var, bool b = true);
-	virtual void Connect(AlgGraphVertex*another);
-	virtual void Write();
-	virtual void Read();
-	virtual QString GetGuiAdvice()const { return "normal"; }
+	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
+	void Activate(QVariant var, bool isActivate = true)
+	{
+		if (isEnabled == true)
+		{
+			emit sig_ActivateBegin();
+			for (auto f : assertFunctions)
+				if (f(var) == false)
+					throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
+
+			_Activate(var, isActivate);
+			emit sig_ActivateEnd();
+		}
+	}
+	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
+	void Connect(AlgGraphVertex*dstVertex)
+	{
+		assert(dstVertex != nullptr);
+		connectedVertexes.append(dstVertex);
+		dstVertex->connectedVertexes.append(this);
+		emit sig_ConnectionAdded(this, dstVertex);
+	}
+	virtual void Reset()
+	{
+		data.clear();
+		isActivated = false;
+		isEnabled = true;
+	}
+	virtual void Release()
+	{
+		Reset();
+		defaultData.clear();
+// 		for (auto v : connectedVertexes)//TODO:控制器中需要清除信号槽
+// 			disconnect(v);
+		connectedVertexes.clear();		
+	}
+
+	virtual QStringList Write()const {throw "Not Implement"; }//TODO:持久化，保存节点信息和结构（*是否保存数据？）
+	virtual void Read(QStringList){ throw "Not Implement";}//TODO:从持久化信息中恢复
+	virtual QString GetGuiAdvice()const { return "normal"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
 
 	QVariant data;//数据
 	QVariant defaultData;//默认值
@@ -65,13 +100,34 @@ public:
 	AlgGraphNode& node;//从属的节点
 	QList<AlgGraphVertex*> connectedVertexes;//连接到的端口
 
-	std::atomic_bool is_Activated = false;//激活标志
-	std::atomic_bool is_Enabled = true;//使能标志
+	std::atomic_bool isActivated = false;//激活标志
+	std::atomic_bool isEnabled = true;//使能标志
 
 	GuiGraphItemVertex*gui = nullptr;
 signals:
-	void sig_ActivateBegin();
-	void sig_ActivateEnd();
+	void sig_ActivateBegin();//激活开始
+	void sig_Activated(QVariant var, bool is_Activated);//激活信号，可用来激活下一个节点
+	void sig_ActivateEnd();//激活结束【不一定激活成功】
+
+	void sig_ConnectionAdded(AlgGraphVertex*src, AlgGraphVertex*dst);
+protected:
+	//自定义激活部分，
+	//通过后，isAct为true【存储数据】，激活当前Vertex，该Vertex会【发送sig_Activated()】进一步激活；
+	//false则【清空数据】，且【不会发送】sig_Activated()进一步激活
+	virtual void _Activate(QVariant var, bool isAct)
+	{
+		if (isAct == true)
+		{
+			data = var;
+			isActivated = true;
+			emit sig_Activated(var, true);
+		}
+		else
+		{
+			data.clear();
+			isActivated = false;
+		}
+	}
 };
 class AlgGraphVertex_Input
 	:public AlgGraphVertex
@@ -79,12 +135,13 @@ class AlgGraphVertex_Input
 	Q_OBJECT
 public:
 	AlgGraphVertex_Input(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
+
 	enum class Behavior :unsigned char
 	{
 		KEEP = 0,//一直保持激活状态和数据（默认）
-		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失
-		//BUFFER = 2,//缓冲，缓冲输入数据
-	};
+		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失//TODO:可以用Node的激活信号连接Activate(0,false)来实现
+		//BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
+	}behavior=Behavior::KEEP;
 };
 class AlgGraphVertex_Output
 	:public AlgGraphVertex
@@ -92,24 +149,21 @@ class AlgGraphVertex_Output
 	Q_OBJECT
 public:
 	AlgGraphVertex_Output(AlgGraphNode&parent, QString name):AlgGraphVertex(parent,name){}
-	virtual void Activate(QVariant var, bool isDelay)//isDelay，是否延迟才发送（只存数据不发送）
+	virtual void _Activate(QVariant var, bool isDelay)//isDelay，是否延迟才发送【只存数据不发送】。与基类中相比，激活后必定自动清空
 	{
 		if (isDelay == true)
 			data = var;
 		else
 		{
-			emit sig_ActivateBegin();
-
-			emit sig_Activate(var, true);
-			var.clear();
-
-			emit sig_ActivateEnd();
+			data = var;
+			emit sig_Activated(var, true);
+			data.clear();
 		}
 	}
-signals:
-	void sig_Activate(QVariant var, bool b);
 };
+#pragma endregion
 
+#pragma region AlgGraphNode
 //算法节点
 class AlgGraphNode
 	:public QObject
@@ -120,7 +174,7 @@ public:
 	virtual ~AlgGraphNode() {}
 
 	virtual void Init();
-	virtual void Reset();
+	virtual void Reset();//重置运行状态，清除所有运行时参数
 	virtual void Release();
 	virtual QString GetGuiAdvice()const { return "normal"; }
 
@@ -138,8 +192,8 @@ public:
 	void Activate();
 	void Run(/*QMap<QString, QVariant>*/);
 	void Output();
-	void Pause();
-	void Stop();
+	void Pause(bool isPause);
+	void Stop(bool isStop);
 
 	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
 	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
@@ -188,6 +242,15 @@ public:
 
 	virtual void Init() override;
 };
+class AlgGraphNode_Add
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
+	QHash<AlgGraphVertex*, int>idxTbl;//对应顺序
+	virtual void Init() override;
+};
 class AlgGraphNode_Function
 	:public AlgGraphNode
 {
@@ -195,6 +258,9 @@ class AlgGraphNode_Function
 public:
 
 };
+
+#pragma endregion
+
 
 enum
 {
@@ -271,6 +337,7 @@ public:
 	{
 		setTransformOriginPoint(boundingRect().center());
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
+		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
 	}
 
 	enum { Type = NODE_TYPE };

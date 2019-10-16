@@ -27,6 +27,13 @@ TestAnything::TestAnything(QWidget *parent)
 		_nodes.append(node);
 		AddGuiNode(node, QPointF(0, 0));
 	});
+	connect(ui.pushButton_NodeAdd, &QPushButton::clicked, this, [this](bool b)
+	{
+		auto node = new AlgGraphNode_Add(this, _pool);
+		node->Init();
+		_nodes.append(node);
+		AddGuiNode(node, QPointF(0, 0));
+	});
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
 	void (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
@@ -62,12 +69,19 @@ void TestAnything::AddGuiNode(AlgGraphNode*node, QPointF center)
 
 void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex)
 {
-	if (srcVertex == nullptr || dstVertex == nullptr || srcVertex->gui == nullptr || dstVertex->gui == nullptr)
+	assert(srcVertex != dstVertex //不允许指向同一个
+		&& srcVertex->connectedVertexes.contains(dstVertex) == false//不允许重复的连接
+		&& dstVertex->connectedVertexes.contains(srcVertex) == false);
+	if (srcVertex == nullptr || dstVertex == nullptr || srcVertex->gui == nullptr || dstVertex->gui == nullptr
+		|| srcVertex == dstVertex //不允许指向同一个
+		|| srcVertex->connectedVertexes.contains(dstVertex) == true//不允许重复的连接
+		|| dstVertex->connectedVertexes.contains(srcVertex) == true)
 		return;
 	srcVertex->connectedVertexes.append(dstVertex);
 	dstVertex->connectedVertexes.append(srcVertex);
 	auto srcItem = srcVertex->gui, dstItem = dstVertex->gui;
 	auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
+	arrow->setZValue(srcItem->zValue() - 0.2);
 	srcItem->AddArrow(arrow);
 	dstItem->AddArrow(arrow);
 	_scene.addItem(arrow);
@@ -77,7 +91,7 @@ void TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVerte
 {
 	if (srcVertex == nullptr || dstVertex == nullptr)
 		return;
-	qDebug() << srcVertex->_vertex.objectName() << dstVertex->_vertex.objectName();
+	qDebug() << __FUNCTION__ << srcVertex->_vertex.objectName() << dstVertex->_vertex.objectName();
 	AddConnection(const_cast<AlgGraphVertex*>(&srcVertex->_vertex), const_cast<AlgGraphVertex*>(&dstVertex->_vertex));
 }
 
@@ -92,10 +106,47 @@ void AlgGraphNode::Init()
 {
 
 }
+void AlgGraphNode_Input::Init()
+{
+	_outputVertex.insert("out", new AlgGraphVertex_Output(*this, "out"));
+}
 
-void AlgGraphNode::Reset()
+void AlgGraphNode_Input::Input(QVariant var)
 {
 
+}
+
+void AlgGraphNode_Output::Init()
+{
+	_inputVertex.insert("in", new AlgGraphVertex_Input(*this, "in"));
+}
+
+void AlgGraphNode_Add::Init()
+{
+	auto pv = new AlgGraphVertex_Input(*this, "in1");
+	idxTbl.insert(pv, _inputVertex.size());//TODO:需要判定是否重名
+	_inputVertex.insert("in1", pv);
+
+	pv = new AlgGraphVertex_Input(*this, "in2");
+	idxTbl.insert(pv, _inputVertex.size());
+	_inputVertex.insert("in2", pv);
+
+	_outputVertex.insert("out", new AlgGraphVertex_Output(*this, "out"));
+}
+void AlgGraphNode::Reset()
+{
+	for (auto v : _inputVertex)
+	{
+		v->isActivated = false;
+		v->isEnabled = true;
+		v->data.clear();
+	}
+	for (auto v : _outputVertex)
+	{
+		v->isActivated = false;
+		v->isEnabled = true;
+		v->data.clear();
+	}
 }
 
 void AlgGraphNode::Release()
@@ -163,12 +214,12 @@ void AlgGraphNode::Output()
 
 }
 
-void AlgGraphNode::Pause()
+void AlgGraphNode::Pause(bool isPause)
 {
 
 }
 
-void AlgGraphNode::Stop()
+void AlgGraphNode::Stop(bool isStop)
 {
 
 }
@@ -371,27 +422,6 @@ void AlgGraphNode::_Run()
 	qDebug() << "End:" << QThread::currentThread() << QTime::currentTime();
 }
 #endif
-#pragma region AlgGraphVertex
-void AlgGraphVertex::Activate(QVariant var, bool b /*= true*/)
-{
-
-}
-
-void AlgGraphVertex::Connect(AlgGraphVertex*another)
-{
-
-}
-
-void AlgGraphVertex::Write()
-{
-
-}
-
-void AlgGraphVertex::Read()
-{
-
-}
-#pragma endregion AlgGraphVertex
 
 GuiGraphNode::GuiGraphNode(const AlgGraphNode&node) :QObject(const_cast<AlgGraphNode*>(&node)), _node(node),
 _nodeItem(new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr))
@@ -420,6 +450,7 @@ QGraphicsItem* GuiGraphNode::InitApperance()
 		_inputVertex.insert(name, vtx);
 		_inputVertexItem.insert(name, pnode);
 	}
+	h = title->boundingRect().height();
 	for (auto vtx : _node.GetVertexes(false))
 	{
 		QString name = vtx->objectName();
@@ -443,20 +474,7 @@ QWidget* GuiGraphNode::InitWidget(QWidget*parent)
 	return _panel;
 }
 
-void AlgGraphNode_Input::Init()
-{
-	_outputVertex.insert("out", new AlgGraphVertex_Output(*this, "out"));
-}
 
-void AlgGraphNode_Input::Input(QVariant var)
-{
-
-}
-
-void AlgGraphNode_Output::Init()
-{
-	_inputVertex.insert("in", new AlgGraphVertex_Input(*this, "in"));
-}
 
 QRectF GuiGraphItemVertex::boundingRect() const
 {
@@ -528,3 +546,4 @@ void GuiGraphItemArrow::updatePosition()
 		p2 = (dstVertex != nullptr) ? (dstVertex->mapToScene(dstVertex->ArrowAttachPosition())) : line().p1();
 	setLine(QLineF(p1, p2));
 }
+
