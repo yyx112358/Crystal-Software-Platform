@@ -71,8 +71,18 @@ public:
 		assert(dstVertex != nullptr);
 		connectedVertexes.append(dstVertex);
 		dstVertex->connectedVertexes.append(this);
-		connect(this, &AlgGraphVertex::sig_Activated, dstVertex, &AlgGraphVertex::Activate);
 		emit sig_ConnectionAdded(this, dstVertex);
+	}
+	void Disconnect(AlgGraphVertex*another)
+	{
+		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
+		{
+			another->connectedVertexes.removeAll(this);
+			if (disconnect(another) == true)//清除连接
+				emit sig_ConnectionRemoved(this, another);
+			/*else */if(another->disconnect(this)==true)
+				emit sig_ConnectionRemoved(another,this);
+		}
 	}
 	//重置，主要是清除运行时状态（图运行后会改变的，主要是数据及激活位）
 	virtual void Reset()
@@ -81,18 +91,27 @@ public:
 		isActivated = false;
 		emit sig_Reseted(this);
 	}
-	//释放，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点connectedVertexes）
+	//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点connectedVertexes）
 	//TODO:是否加入isUnchange参数，设定其它参数是否可变？
-	virtual void Release()
+	virtual void Clear()
 	{
 		Reset();
 		isEnabled = true;
-// 		defaultData.clear();
-// 		additionInfo.clear();
-// 		assertFunctions.clear();
- 		for (auto v : connectedVertexes)//TODO:控制器中需要清除信号槽
- 			disconnect(v);
+		for (auto v : connectedVertexes)//TODO:控制器中需要清除信号槽
+			Disconnect(v);
+		emit sig_Cleared(this);
+	}
+	//释放，释放所有成员为空，成为初始状态
+	virtual void Release()
+	{
+		Clear();
+ 		defaultData.clear();
+ 		additionInfo.clear();
+ 		assertFunctions.clear();
+
+		disconnect();
 		connectedVertexes.clear();
+		gui = nullptr;
 		emit sig_Released(this);
 	}
 
@@ -120,7 +139,9 @@ signals:
 	void sig_ActivateEnd();//激活结束【不一定激活成功】
 
 	void sig_ConnectionAdded(AlgGraphVertex*src, AlgGraphVertex*dst);//连接建立成功
+	void sig_ConnectionRemoved(AlgGraphVertex*src, AlgGraphVertex*dst);//连接移除成功
 	void sig_Reseted(AlgGraphVertex*);//重置成功
+	void sig_Cleared(AlgGraphVertex*);//清空成功
 	void sig_Released(AlgGraphVertex*);//释放成功
 protected:
 	//自定义激活部分，
@@ -194,11 +215,12 @@ public:
 
 	virtual void Init();//初始化一些参数，如果初始化后将_isUnchange设为true，则不能更改设定
 	virtual void Reset();//重置运行状态，清除所有运行时参数（运行后可变的参数）
+	virtual void Clear() {}
 	virtual void Release();
 	virtual QString GetGuiAdvice()const { return "normal"; }
 
-	virtual void AddVertex(QString name, QVariant defaultValue, bool isInput);
-	virtual void AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
+	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//添加默认节点，并连接输入节点的sig_Activated()信号
+	virtual QHash<QString,AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
 	virtual void RemoveVertex(QString name);
 	virtual void RemoveVertex(QStringList names);
 	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
@@ -279,6 +301,9 @@ public:
 	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
 	QHash<AlgGraphVertex*, int>idxTbl;//对应顺序
 	virtual void Init() override;
+protected:
+	virtual QVariantHash _Run(QVariantHash data) override;
+
 };
 class AlgGraphNode_Function
 	:public AlgGraphNode
@@ -468,8 +493,9 @@ class TestAnything : public QMainWindow
 public:
 	TestAnything(QWidget *parent = Q_NULLPTR);
 
-	void AddNode(QString NodeName);
-	void AddGuiNode(AlgGraphNode*node,GuiGraphNode*guiNode=nullptr, QPointF center = QPointF(0, 0));
+	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphNode*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
+	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
+	GuiGraphNode* AddGuiNode(AlgGraphNode&node,GuiGraphNode*guiNode=nullptr, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
 	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
 	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
 
@@ -481,11 +507,14 @@ private:
 	QList<AlgGraphNode*>_nodes;
 	QList<GuiGraphItemArrow*>_arrows;
 
+	QGraphicsItem*selectedItem = nullptr;
+
 	QThreadPool _pool;
 };
 
 
 #if 0
+/*
 //TODO:InputVertex,OutputVertex,TriggerVertex,EnableVertex
 class VertexInfo
 {
@@ -657,4 +686,5 @@ public:
 	QHash<const AlgGraphNode*, GuiGraphNode*>nodes;
 	QGraphicsScene scene;
 };
+*/
 #endif
