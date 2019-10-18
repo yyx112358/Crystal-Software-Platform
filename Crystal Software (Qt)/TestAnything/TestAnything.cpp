@@ -18,21 +18,21 @@ TestAnything::TestAnything(QWidget *parent)
 		auto node = new AlgGraphNode_Input(this, _pool);
 		node->Init();
 		_nodes.append(node);
-		AddGuiNode(node, QPointF(0, 0));
+		AddGuiNode(node, new GuiGraphNode_Input(*node), QPointF(0, 0));
 	});
 	connect(ui.pushButton_NodeOutput, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode_Output(this, _pool);
 		node->Init();
 		_nodes.append(node);
-		AddGuiNode(node, QPointF(0, 0));
+		AddGuiNode(node,new GuiGraphNode_Output(*node), QPointF(0, 0));
 	});
 	connect(ui.pushButton_NodeAdd, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode_Add(this, _pool);
 		node->Init();
 		_nodes.append(node);
-		AddGuiNode(node, QPointF(0, 0));
+		AddGuiNode(node, nullptr, QPointF(0, 0));
 	});
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
 	void (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
@@ -40,23 +40,24 @@ TestAnything::TestAnything(QWidget *parent)
 
 	sizeof(AlgGraphVertex); sizeof(AlgGraphVertex_Input); sizeof(GuiGraphNode);sizeof(AlgGraphNode);
 
-	auto nodein = new AlgGraphNode_Input(this, _pool);
-	nodein->Init();
-	_nodes.append(nodein);
-	AddGuiNode(nodein, QPointF(0, 0));
-
-	auto nodeout = new AlgGraphNode_Output(this, _pool);
-	nodeout->Init();
-	_nodes.append(nodeout);
-	AddGuiNode(nodeout, QPointF(200, 0));
+// 	auto nodein = new AlgGraphNode_Input(this, _pool);
+// 	nodein->Init();
+// 	_nodes.append(nodein);
+// 	AddGuiNode(nodein, QPointF(0, 0));
+// 
+// 	auto nodeout = new AlgGraphNode_Output(this, _pool);
+// 	nodeout->Init();
+// 	_nodes.append(nodeout);
+// 	AddGuiNode(nodeout, QPointF(200, 0));
 
 	//AddConnection(nodein->GetVertexes(false).value("out"), nodeout->GetVertexes(true).value("in"));
 }
 
-void TestAnything::AddGuiNode(AlgGraphNode*node, QPointF center)
+void TestAnything::AddGuiNode(AlgGraphNode*node, GuiGraphNode*guiNode /*= nullptr*/, QPointF center /*= QPointF(0, 0)*/)
 {
 	//TODO:后期改为：首先根据AlgGraphNode的GetGuiAdvice()，在工厂类/函数中创建相应GUI，如果没有返回或返回失败，则根据类型（Input/Output等大类）生成默认GUI
-	auto guiNode = new GuiGraphNode(*node);
+	if (guiNode == nullptr)
+		guiNode = new GuiGraphNode(*node);
 	node->AttachGui(guiNode);
 	auto guiItem=guiNode->InitApperance();
 	guiItem->setPos(center);
@@ -77,14 +78,16 @@ void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVer
 		|| srcVertex->connectedVertexes.contains(dstVertex) == true//不允许重复的连接
 		|| dstVertex->connectedVertexes.contains(srcVertex) == true)
 		return;
-	srcVertex->connectedVertexes.append(dstVertex);
-	dstVertex->connectedVertexes.append(srcVertex);
+	//srcVertex->connectedVertexes.append(dstVertex);
+	//dstVertex->connectedVertexes.append(srcVertex);
+	srcVertex->Connect(dstVertex);
+	
 	auto srcItem = srcVertex->gui, dstItem = dstVertex->gui;
 	auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
 	arrow->setZValue(srcItem->zValue() - 0.2);
 	srcItem->AddArrow(arrow);
 	dstItem->AddArrow(arrow);
-	_scene.addItem(arrow);
+	_scene.addItem(arrow);	
 }
 
 void TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex)
@@ -98,10 +101,22 @@ void TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVerte
 void TestAnything::slot_Start(bool b)
 {
 	qDebug() << __FUNCSIG__;
-
+	for (auto n : _nodes)
+	{
+		n->Reset();
+		n->Activate();
+	}
 }
 
 #pragma region AlgGraphNode
+
+AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool) :QObject(parent), _pool(pool)
+{
+	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, [this] {emit sig_RunFinished(this); });
+	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, &AlgGraphNode::Output);
+}
+
+
 void AlgGraphNode::Init()
 {
 
@@ -111,14 +126,25 @@ void AlgGraphNode_Input::Init()
 	_outputVertex.insert("out", new AlgGraphVertex_Output(*this, "out"));
 }
 
-void AlgGraphNode_Input::Input(QVariant var)
+QVariantHash AlgGraphNode_Input::_Run(QVariantHash data)
 {
-
+	QVariantHash result;
+	result["out"] = _gui->GetData();
+	return result;
 }
 
 void AlgGraphNode_Output::Init()
 {
-	_inputVertex.insert("in", new AlgGraphVertex_Input(*this, "in"));
+	auto pvtx = new AlgGraphVertex_Input(*this, "in");
+	_inputVertex.insert("in", pvtx);
+	connect(pvtx, &AlgGraphVertex::sig_Activated, this, &AlgGraphNode::Activate);
+}
+
+QVariantHash AlgGraphNode_Output::_Run(QVariantHash data)
+{
+	for (auto d : data)
+		_gui->SetData(d);
+	return data;
 }
 
 void AlgGraphNode_Add::Init()
@@ -136,24 +162,23 @@ void AlgGraphNode_Add::Init()
 void AlgGraphNode::Reset()
 {
 	for (auto v : _inputVertex)
-	{
-		v->isActivated = false;
-		v->isEnabled = true;
-		v->data.clear();
-	}
+		v->Reset();
 	for (auto v : _outputVertex)
-	{
-		v->isActivated = false;
-		v->isEnabled = true;
-		v->data.clear();
-	}
+		v->Reset();
+	_pause = false;
+	_stop = false;
+	
+	//_lock.unlock();//TODO:考虑加锁
 }
-
 void AlgGraphNode::Release()
 {
-
+	Reset();
+	for (auto v : _inputVertex)
+		v->Release();
+	for (auto v : _outputVertex)
+		v->Release();
+	_isEnable = true;
 }
-
 void AlgGraphNode::AddVertex(QString name, QVariant defaultValue, bool isInput)
 {
 
@@ -201,17 +226,53 @@ void AlgGraphNode::Read()
 
 void AlgGraphNode::Activate()
 {
-
+	qDebug() << objectName() << __FUNCTION__;
+	if (_result.isRunning() == false)//运行期间，阻塞输入
+	{
+		for (auto v : _inputVertex)//检查是否全部激活
+			if (v->isActivated == false)
+				return;
+		Run();
+	}
 }
 
-void AlgGraphNode::Run(/*QMap<QString, QVariant>*/)
+void AlgGraphNode::Run()
 {
-
+	//TODO:加锁
+	qDebug() << objectName() << __FUNCTION__;
+	auto data = _LoadInput();
+	emit sig_ActivatedFinished(this);
+	//TODO:暂停和退出
+	switch (_mode)
+	{
+	case AlgGraphNode::RunMode::Thread:
+		_result.setFuture(QtConcurrent::run(&_pool, this, &AlgGraphNode::_Run,data));
+		break;
+	case AlgGraphNode::RunMode::Direct:
+		_LoadOutput(_Run(data));
+		emit sig_RunFinished(this);
+		Output();
+		break;
+	case AlgGraphNode::RunMode::Function:
+		throw "Not Implement";
+		break;
+	default:
+		break;
+	}
+	//TODO:暂停和退出
+	//emit sig_ResultReady();
 }
 
 void AlgGraphNode::Output()
 {
-
+	//TODO:加锁
+	//qDebug() << "====Output====:" << QThread::currentThread();
+	if (_mode != RunMode::Direct)
+		_LoadOutput((_result.future().resultCount() > 0) ? (_result.result()) : (QVariantHash()));
+	//_result.setFuture(QFuture<QVariantHash>());
+	for (auto &v : _outputVertex)
+		v->Activate(v->data, true);
+	emit sig_OutputFinished(this);
 }
 
 void AlgGraphNode::Pause(bool isPause)
@@ -222,6 +283,30 @@ void AlgGraphNode::Pause(bool isPause)
 void AlgGraphNode::Stop(bool isStop)
 {
 
+}
+
+QVariantHash AlgGraphNode::_LoadInput()
+{
+	QHash<QString, QVariant>result;
+	for (auto it = _inputVertex.begin(); it != _inputVertex.end(); ++it)
+		result.insert(it.key(), it.value()->data);
+	return result;
+}
+
+QVariantHash AlgGraphNode::_Run(QVariantHash data)
+{
+	return data;
+}
+
+void AlgGraphNode::_LoadOutput(QVariantHash result)
+{
+	for (auto it = result.begin(); it != result.end(); ++it)
+	{
+		auto vtx = qobject_cast<AlgGraphVertex_Output*>(_outputVertex.value(it.key()));
+		if (vtx != nullptr)
+			vtx->data = it.value();
+		//else GraphWarning();//TODO:警告
+	}
 }
 
 #pragma endregion AlgGraphNode
@@ -465,13 +550,6 @@ QGraphicsItem* GuiGraphNode::InitApperance()
 		_inputVertexItem.insert(name, pnode);
 	}
 	return _nodeItem;
-}
-
-QWidget* GuiGraphNode::InitWidget(QWidget*parent)
-{
-	_panel = new QPlainTextEdit(parent);
-	connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
-	return _panel;
 }
 
 
