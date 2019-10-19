@@ -378,8 +378,6 @@ protected:
 	}
 	virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override { _mouseState = 1; QGraphicsItem::hoverEnterEvent(event); }
 	virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override { _mouseState = 0; QGraphicsItem::hoverLeaveEvent(event); }
-// 	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override{ _mouseState = 1; QGraphicsItem::mousePressEvent(event); }
-// 	virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override { 	_mouseState = 0; QGraphicsItem::mouseReleaseEvent(event); }
 
 };
 
@@ -387,23 +385,17 @@ class GuiGraphItemNode
 	:public QGraphicsRectItem
 {
 public:
-	GuiGraphItemNode(QRectF area, QGraphicsItem*parent) :QGraphicsRectItem(area, parent) 
+	GuiGraphItemNode(QRectF area, QGraphicsItem*parent,GuiGraphNode&holder) :QGraphicsRectItem(area, parent),_holder(holder)
 	{
 		setTransformOriginPoint(boundingRect().center());
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
-		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
+		//setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
+		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
 	}
 
 	enum { Type = NODE_TYPE };
 	virtual int type()const { return Type; }
-	virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value)
-	{
-		if (change == QGraphicsItem::ItemPositionChange) {
-
-		}
-		return value;
-	}
-
+	const GuiGraphNode&_holder;
 protected:
 };
 class GuiGraphNode
@@ -431,14 +423,13 @@ public:
 	const AlgGraphNode& _node;//对相应AlgGraphNode的常引用，只读不可写
 signals:
 	void sig_ValueChanged();//TODO:后面要下放到相应输入输出子类当中
-protected:
-	
+protected:	
 	QHash<QString, const AlgGraphVertex*>_inputVertex;//输入节点
 	QHash<QString, const AlgGraphVertex*>_outputVertex;//输入节点
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 
 	GuiGraphItemNode* _nodeItem=nullptr;//在场景中绘制和交互的物体
-	QHash<QString, GuiGraphItemVertex*> _inputVertexItem;//输入节点
-	QHash<QString, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 	QWidget* _panel;//面板控件，TODO:后面要下放到相应输入输出子类当中
 };
 
@@ -480,11 +471,26 @@ public:
 
 signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
+	void sig_RemoveItems(QList<QGraphicsItem*>items);
 protected:
-	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+	virtual void keyPressEvent(QKeyEvent *event) override;
 
 	GuiGraphItemArrow*arrow = nullptr;
+};
+
+class GraphView
+	:public QGraphicsView
+{
+	Q_OBJECT
+public:
+	GraphView(QWidget*parent) :QGraphicsView(parent) {}
+
+protected:
+	virtual void wheelEvent(QWheelEvent *event) override;
+	//virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
+
 };
 
 class TestAnything : public QMainWindow
@@ -496,12 +502,16 @@ public:
 	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphNode*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
 	GuiGraphNode* AddGuiNode(AlgGraphNode&node,GuiGraphNode*guiNode=nullptr, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
+	
+	void RemoveNode(AlgGraphNode*node);
 	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
 	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
 
 	void slot_Start(bool b);
 
 private:
+	void slot_RemoveItems(QList<QGraphicsItem*>items);
+
 	Ui::TestAnythingClass ui;
 	GraphScene _scene;
 	QList<AlgGraphNode*>_nodes;

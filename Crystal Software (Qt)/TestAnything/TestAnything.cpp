@@ -16,33 +16,36 @@ TestAnything::TestAnything(QWidget *parent)
 	connect(ui.pushButton_NodeInput, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode_Input(this, _pool);
-		AddNode(*node, new GuiGraphNode_Input(*node), QPointF(-100, 0));
-// 		auto node = new AlgGraphNode_Input(this, _pool);
-// 		node->Init();
-// 		_nodes.append(node);
-// 		AddGuiNode(node, new GuiGraphNode_Input(*node), QPointF(0, 0));
+		auto guiNode = new GuiGraphNode_Input(*node);
+		AddNode(*node, guiNode, QPointF(-100, 0));
+		connect(guiNode, &GuiGraphNode::sig_ValueChanged, node, &AlgGraphNode_Input::Activate);
 	});
 	connect(ui.pushButton_NodeOutput, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode_Output(this, _pool);
-		AddNode(*node, new GuiGraphNode_Output(*node), QPointF(100, 0));
-// 		auto node = new AlgGraphNode_Output(this, _pool);
-// 		node->Init();
-// 		_nodes.append(node);
-// 		AddGuiNode(node,new GuiGraphNode_Output(*node), QPointF(0, 0));
-	});
+		AddNode(*node, new GuiGraphNode_Output(*node), QPointF(100, 0));	});
 	connect(ui.pushButton_NodeAdd, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode_Add(this, _pool);
 		AddNode(*node, nullptr, QPointF(0, 0));
-// 		auto node = new AlgGraphNode_Add(this, _pool);
-// 		node->Init();
-// 		_nodes.append(node);
-// 		AddGuiNode(node, nullptr, QPointF(0, 0));
 	});
+
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
 	void (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
+	connect(&_scene, &GraphScene::sig_RemoveItems, this, [this](QList<QGraphicsItem*>items)
+	{
+		for (auto item : items)
+		{
+			switch (item->type())
+			{
+			case GuiGraphItemNode::Type:
+				RemoveNode(const_cast<AlgGraphNode*> (&((qgraphicsitem_cast<GuiGraphItemNode*>(item))->_holder._node)));
+			default:
+				break;
+			}
+		}
+	});
 
 	sizeof(AlgGraphVertex); sizeof(AlgGraphVertex_Input); sizeof(GuiGraphNode);sizeof(AlgGraphNode);
 }
@@ -52,10 +55,14 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 	node.Init();
 	_nodes.append(&node);
 	//TODO:删除节点及其附属
-	connect(&node, &AlgGraphNode::destroyed, this, [this] {
+	connect(&node, &AlgGraphNode::destroyed, this, [this] 
+	{
 		qDebug() << sender()->objectName() << __FUNCTION__;
-		int n = _nodes.removeAll(qobject_cast<AlgGraphNode*>(sender())); 
-		//assert(n > 0); 
+		if (_nodes.size() > 0)
+		{
+			int n = _nodes.removeAll(qobject_cast<AlgGraphNode*>(sender()));
+			assert(n > 0);
+		}
 	});
 	AddGuiNode(node, guiNode, center);
 	return node;
@@ -78,6 +85,12 @@ GuiGraphNode* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphNode*guiNode /
 		ui.groupBox_Output->layout()->addWidget(guiNode->InitWidget(ui.groupBox_Output));
 	
 	return guiNode;
+}
+
+void TestAnything::RemoveNode(AlgGraphNode*node)
+{
+	assert(_nodes.contains(node));
+
 }
 
 void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex)
@@ -113,10 +126,14 @@ void TestAnything::slot_Start(bool b)
 {
 	qDebug() << __FUNCSIG__;
 	for (auto n : _nodes)
-	{
 		n->Reset();
+	for (auto n : _nodes)
 		n->Activate();
-	}
+}
+
+void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
+{
+
 }
 
 #pragma region AlgGraphNode
@@ -542,7 +559,7 @@ void AlgGraphNode::_Run()
 #endif
 #pragma region GuiGraphNode
 GuiGraphNode::GuiGraphNode(const AlgGraphNode&node) :QObject(const_cast<AlgGraphNode*>(&node)), _node(node),
-_nodeItem(new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr))
+_nodeItem(new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr,*this))
 {
 	setObjectName(node.objectName());
 }
@@ -566,7 +583,7 @@ QGraphicsItem* GuiGraphNode::InitApperance()
 
 		vtx->gui = pnode;
 		_inputVertex.insert(name, vtx);
-		_inputVertexItem.insert(name, pnode);
+		_inputVertexItem.insert(vtx, pnode);
 	}
 	h = title->boundingRect().height();
 	for (auto vtx : _node.GetVertexes(false))
@@ -580,7 +597,7 @@ QGraphicsItem* GuiGraphNode::InitApperance()
 
 		vtx->gui = pnode;
 		_inputVertex.insert(name, vtx);
-		_inputVertexItem.insert(name, pnode);
+		_inputVertexItem.insert(vtx, pnode);
 	}
 	return _nodeItem;
 }
@@ -597,38 +614,47 @@ QRectF GuiGraphItemVertex::boundingRect() const
 
 void GuiGraphItemVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
 {
+	painter->drawText(0, boundingRect().height(), _vertex.objectName()/*,QTextOption(Qt::AlignmentFlag::AlignCenter)*/);
 	if (_mouseState == 1)
 		painter->drawRect(boundingRect());
-	painter->drawText(0, boundingRect().height(), _vertex.objectName()/*,QTextOption(Qt::AlignmentFlag::AlignCenter)*/);
+	else
+	{
+		painter->setPen(QPen(QColor(200, 200, 200)));
+		//painter->setBrush(QBrush(QColor(100, 100, 100), Qt::BrushStyle::SolidPattern));
+		painter->drawRect(boundingRect());
+	}
 }
 
 
 void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-	if (arrow == nullptr) 
-	{	
-		auto item = itemAt(event->scenePos(),QTransform());	
-		if (item != nullptr && item->type() == GuiGraphItemVertex::Type/*qgraphicsitem_cast<GuiGraphItemVertex*>(item) == nullptr*/)
-		{
-			auto pos = item->mapToScene(item->boundingRect().center());
-			arrow = new GuiGraphItemArrow(QLineF(pos, pos), nullptr);
-			addItem(arrow);
-		}
-	}
-	else
+	if(event->button()==Qt::LeftButton)
 	{
-		auto srcPos = arrow->line().p1(),dstPos=arrow->line().p2();
-		removeItem(arrow);
-		delete arrow;
-		arrow = nullptr;
-
-		auto dstItem = itemAt(dstPos, QTransform()),srcItem= itemAt(srcPos, QTransform());//必须先删掉arrow，否则获取的是arrow
-		if (dstItem != nullptr && dstItem->type() == GuiGraphItemVertex::Type)
+		if (arrow == nullptr)
 		{
-			auto srcItem = itemAt(srcPos, QTransform());
-			if(srcItem!=nullptr && srcItem->type() == GuiGraphItemVertex::Type)
-				emit sig_ConnectionAdded(qgraphicsitem_cast<GuiGraphItemVertex*>(srcItem)
-					, qgraphicsitem_cast<GuiGraphItemVertex*>(dstItem));
+			auto item = itemAt(event->scenePos(), QTransform());
+			if (/*item != nullptr && item->type() == GuiGraphItemVertex::Type*/qgraphicsitem_cast<GuiGraphItemVertex*>(item) != nullptr)
+			{
+				auto pos = item->mapToScene(item->boundingRect().center());
+				arrow = new GuiGraphItemArrow(QLineF(pos, pos), nullptr);
+				addItem(arrow);
+			}
+		}
+		else
+		{
+			auto srcPos = arrow->line().p1(), dstPos = arrow->line().p2();
+			removeItem(arrow);
+			delete arrow;
+			arrow = nullptr;
+
+			auto dstItem = itemAt(dstPos, QTransform()), srcItem = itemAt(srcPos, QTransform());//必须先删掉arrow，否则获取的是arrow
+			if (qgraphicsitem_cast<GuiGraphItemVertex*>(dstItem) != nullptr)
+			{
+				auto srcItem = itemAt(srcPos, QTransform());
+				if (srcItem != nullptr && srcItem->type() == GuiGraphItemVertex::Type)
+					emit sig_ConnectionAdded(qgraphicsitem_cast<GuiGraphItemVertex*>(srcItem)
+						, qgraphicsitem_cast<GuiGraphItemVertex*>(dstItem));
+			}
 		}
 	}
 
@@ -639,11 +665,9 @@ void GraphScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 	if (arrow != nullptr) 
 	{
 		auto item = itemAt(event->scenePos(), QTransform());
-		if (item!=nullptr && item->type() == GuiGraphItemVertex::Type/*qgraphicsitem_cast<GuiGraphItemVertex*>(item) != nullptr*/)
+		if (qgraphicsitem_cast<GuiGraphItemVertex*>(item) != nullptr)
 		{
 			auto pos = item->mapToScene(item->boundingRect().center());
-// 			qDebug()<<event->screenPos()<< item->mapFromScene(QPointF(0,0))<< item->mapFromParent(QPointF(0, 0))
-// 				<<item->mapFromScene()
 			arrow->setLine(QLineF(arrow->line().p1(), pos));
 		}
 		else
@@ -653,10 +677,26 @@ void GraphScene::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 }
 
 
+void GraphScene::keyPressEvent(QKeyEvent *event)
+{
+	if (event->key() == Qt::Key_Delete)
+	{
+		auto selects = this->selectedItems();
+		emit sig_RemoveItems(selects);
+	}
+}
+
 void GuiGraphItemArrow::updatePosition()
 {
 	QPointF p1 = (srcVertex != nullptr) ? (srcVertex->mapToScene(srcVertex->ArrowAttachPosition())) : line().p1(),
 		p2 = (dstVertex != nullptr) ? (dstVertex->mapToScene(dstVertex->ArrowAttachPosition())) : line().p1();
 	setLine(QLineF(p1, p2));
+}
+
+void GraphView::wheelEvent(QWheelEvent *event)
+{
+	QPoint scrollAmount = event->angleDelta();
+	float factor = (scrollAmount.y() > 0) ? (1.259921049894873164) : (1 / 1.259921049894873164);
+	scale(factor, factor);
 }
 
