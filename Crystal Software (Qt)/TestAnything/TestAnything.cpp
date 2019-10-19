@@ -59,10 +59,7 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 	{
 		qDebug() << sender()->objectName() << __FUNCTION__;
 		if (_nodes.size() > 0)
-		{
-			int n = _nodes.removeAll(qobject_cast<AlgGraphNode*>(sender()));
-			assert(n > 0);
-		}
+			_nodes.removeAll(qobject_cast<AlgGraphNode*>(sender()));
 	});
 	AddGuiNode(node, guiNode, center);
 	return node;
@@ -90,7 +87,10 @@ GuiGraphNode* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphNode*guiNode /
 void TestAnything::RemoveNode(AlgGraphNode*node)
 {
 	assert(_nodes.contains(node));
-
+	//_scene.removeItem(node->_gui->_nodeItem);
+	_nodes.removeAll(node);
+	//node->deleteLater();
+	delete node;
 }
 
 void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex)

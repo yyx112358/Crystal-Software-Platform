@@ -127,7 +127,7 @@ public:
 	QList<std::function<bool(const QVariant&)>> assertFunctions;//输入校验
 
 	AlgGraphNode& node;//从属的节点
-	QList<AlgGraphVertex*> connectedVertexes;//连接到的端口
+	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
@@ -168,6 +168,7 @@ class AlgGraphVertex_Input
 	Q_OBJECT
 public:
 	AlgGraphVertex_Input(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
+	virtual ~AlgGraphVertex_Input() {  }
 
 	enum class Behavior :unsigned char
 	{
@@ -182,6 +183,8 @@ class AlgGraphVertex_Output
 	Q_OBJECT
 public:
 	AlgGraphVertex_Output(AlgGraphNode&parent, QString name):AlgGraphVertex(parent,name){}
+	virtual ~AlgGraphVertex_Output() { Release(); }
+
 	virtual void _Activate(QVariant var, bool isNow)//isNow，是否立刻发送【否则只存数据不发送】。与基类中相比，激活后必定自动清空
 	{
 		if (isNow == false)
@@ -247,6 +250,7 @@ signals:
 	void sig_ActivatedFinished(AlgGraphNode*node);//节点被激活
 	void sig_RunFinished(AlgGraphNode*node);//运行结束
 	void sig_OutputFinished(AlgGraphNode*node);//输出结束
+
 protected:
 	virtual QVariantHash _LoadInput();/*自定义读取输入，默认直接将数据从Vertex当中复制一份，以免运行过程中输入被修改*/
 	virtual QVariantHash _Run(QVariantHash data);//主要的运行部分，【将在另一个线程中运行】
@@ -266,7 +270,7 @@ protected:
 	std::atomic_bool _pause = false;//暂停标志
 	std::atomic_bool _stop = false;//结束标志
 
-	GuiGraphNode* _gui = nullptr;
+	GuiGraphNode* _gui = nullptr;	
 };
 
 class AlgGraphNode_Input
@@ -404,12 +408,29 @@ class GuiGraphNode
 	Q_OBJECT
 public:
 	GuiGraphNode(const AlgGraphNode&node);
+	virtual ~GuiGraphNode() 
+	{
+		qDebug() << _node.objectName() << __FUNCTION__;
+		if (_nodeItem != nullptr) 
+		{
+			//if(_nodeItem->scene()!=nullptr)
+			//	_nodeItem->scene()->removeItem(_nodeItem);
+			delete _nodeItem;
+		}
+		if (_panel != nullptr)
+			delete _panel;
+	}
 	QGraphicsItem* InitApperance();
 
 	virtual QWidget* InitWidget(QWidget*parent)
 	{
 		_panel = new QPlainTextEdit(parent);
-		connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
+		//connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
+// 		connect(this, &GuiGraphNode::destroyed, this, [this] 
+// 		{
+// 			_nodeItem->scene()->removeItem(_nodeItem); 
+// 			delete _nodeItem;
+// 		});
 		return _panel;
 	}
 
@@ -439,6 +460,7 @@ class GuiGraphNode_Input
 	Q_OBJECT
 public:
 	GuiGraphNode_Input(const AlgGraphNode&node):GuiGraphNode(node){}
+	virtual ~GuiGraphNode_Input() {}
 	virtual QWidget* InitWidget(QWidget*parent)
 	{
 		_panel = new QPlainTextEdit(parent);
@@ -454,6 +476,7 @@ class GuiGraphNode_Output
 	Q_OBJECT
 public:
 	GuiGraphNode_Output(const AlgGraphNode&node) :GuiGraphNode(node) {}
+	virtual ~GuiGraphNode_Output() {}
 	virtual QWidget* InitWidget(QWidget*parent)
 	{
 		_panel = new QLabel(parent);
@@ -468,7 +491,7 @@ class GraphScene
 	Q_OBJECT
 public:
 	GraphScene(QObject*parent):QGraphicsScene(parent){}
-
+	virtual ~GraphScene() {}
 signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
@@ -486,7 +509,7 @@ class GraphView
 	Q_OBJECT
 public:
 	GraphView(QWidget*parent) :QGraphicsView(parent) {}
-
+	virtual ~GraphView() {}
 protected:
 	virtual void wheelEvent(QWheelEvent *event) override;
 	//virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
@@ -498,6 +521,12 @@ class TestAnything : public QMainWindow
 	Q_OBJECT
 public:
 	TestAnything(QWidget *parent = Q_NULLPTR);
+	~TestAnything()
+	{
+		for (auto n : _nodes)
+			delete n;
+		_nodes.clear();
+	}
 
 	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphNode*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
