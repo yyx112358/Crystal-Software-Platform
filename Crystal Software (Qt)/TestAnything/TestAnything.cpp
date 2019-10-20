@@ -153,26 +153,10 @@ void AlgGraphNode_Input::Init()
 {
 	AddVertex("out", "out", false);
 }
-
-QVariantHash AlgGraphNode_Input::_Run(QVariantHash data)
-{
-	QVariantHash result;
-	result["out"] = _gui->GetData();
-	return result;
-}
-
 void AlgGraphNode_Output::Init()
 {
 	AddVertex("in", "in", true);
 }
-
-QVariantHash AlgGraphNode_Output::_Run(QVariantHash data)
-{
-	for (auto d : data)
-		_gui->SetData(d);
-	return data;
-}
-
 void AlgGraphNode_Add::Init()
 {
 	AddVertex("in1", "in", true);
@@ -180,6 +164,20 @@ void AlgGraphNode_Add::Init()
 	AddVertex("out", "out", false);
 }
 
+QVariantHash AlgGraphNode_Input::_Run(QVariantHash data)
+{
+	assert(_gui.isNull() == false);
+	QVariantHash result;
+	result["out"] = _gui->GetData();
+	return result;
+}
+QVariantHash AlgGraphNode_Output::_Run(QVariantHash data)
+{
+	assert(_gui.isNull() == false);
+	for (auto d : data)
+		_gui->SetData(d);
+	return data;
+}
 QVariantHash AlgGraphNode_Add::_Run(QVariantHash data)
 {
 	QVariantHash result;
@@ -192,10 +190,32 @@ QVariantHash AlgGraphNode_Add::_Run(QVariantHash data)
 
 void AlgGraphNode::Reset()
 {
-	for (auto v : _inputVertex)
-		v->Reset();
-	for (auto v : _outputVertex)
-		v->Reset();
+	for (auto it = _inputVertex.begin(); it != _inputVertex.end();)
+	{
+		if (it->isNull() == false)
+		{
+			(*it)->Reset();
+			++it;
+		}
+		else
+		{
+			qDebug() << __FUNCTION__ << it.key() << "Not exist";
+			it = _inputVertex.erase(it);
+		}
+	}
+	for (auto it = _outputVertex.begin(); it != _outputVertex.end();)
+	{
+		if (it->isNull() == false)
+		{
+			(*it)->Reset();
+			++it;
+		}
+		else
+		{
+			qDebug() << __FUNCTION__ << it.key() << "Not exist";
+			it = _outputVertex.erase(it);
+		}
+	}
 	_pause = false;
 	_stop = false;
 	
@@ -279,9 +299,20 @@ void AlgGraphNode::Activate()
 	qDebug() << objectName() << __FUNCTION__;
 	if (_result.isRunning() == false)//运行期间，阻塞输入
 	{
-		for (auto v : _inputVertex)//检查是否全部激活
-			if (v->isActivated == false)
-				return;
+		for (auto it = _inputVertex.begin(); it != _inputVertex.end();)//检查是否全部激活
+		{
+			if (it->isNull() == false)
+			{
+				if ((*it)->isActivated == false)
+					return;
+				++it;
+			}
+			else
+			{
+				qDebug() << __FUNCTION__ << it.key() << "Not exist";
+				it = _inputVertex.erase(it);
+			}
+		}
 		Run();
 	}
 }
@@ -320,8 +351,19 @@ void AlgGraphNode::Output()
 	if (_mode != RunMode::Direct)
 		_LoadOutput((_result.future().resultCount() > 0) ? (_result.result()) : (QVariantHash()));
 	//_result.setFuture(QFuture<QVariantHash>());
-	for (auto &v : _outputVertex)
-		v->Activate(v->data, true);
+	for (auto it = _outputVertex.begin(); it != _outputVertex.end();)
+	{
+		if (it->isNull() == false)
+		{
+			(*it)->Activate((*it)->data, true);
+			++it;
+		}
+		else
+		{
+			qDebug() << __FUNCTION__ << it.key() << "Not exist";
+			it = _outputVertex.erase(it);
+		}
+	}
 	emit sig_OutputFinished(this);
 }
 
@@ -636,7 +678,7 @@ void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 			if (/*item != nullptr && item->type() == GuiGraphItemVertex::Type*/qgraphicsitem_cast<GuiGraphItemVertex*>(item) != nullptr)
 			{
 				auto pos = item->mapToScene(item->boundingRect().center());
-				arrow = new GuiGraphItemArrow(QLineF(pos, pos), nullptr);
+				arrow = new QGraphicsLineItem(QLineF(pos, pos), nullptr);
 				addItem(arrow);
 			}
 		}
@@ -688,8 +730,8 @@ void GraphScene::keyPressEvent(QKeyEvent *event)
 
 void GuiGraphItemArrow::updatePosition()
 {
-	QPointF p1 = (srcVertex != nullptr) ? (srcVertex->mapToScene(srcVertex->ArrowAttachPosition())) : line().p1(),
-		p2 = (dstVertex != nullptr) ? (dstVertex->mapToScene(dstVertex->ArrowAttachPosition())) : line().p1();
+	QPointF p1 = (srcVertex.isNull()==false) ? (srcVertex->mapToScene(srcVertex->ArrowAttachPosition())) : line().p1(),
+		p2 = (dstVertex.isNull()==false) ? (dstVertex->mapToScene(dstVertex->ArrowAttachPosition())) : line().p1();
 	setLine(QLineF(p1, p2));
 }
 

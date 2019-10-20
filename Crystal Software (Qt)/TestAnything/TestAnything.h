@@ -97,8 +97,13 @@ public:
 	{
 		Reset();
 		isEnabled = true;
-		for (auto v : connectedVertexes)//TODO:控制器中需要清除信号槽
-			Disconnect(v);
+		while (connectedVertexes.size() > 0)//清除connectedVertexes
+		{
+			if(connectedVertexes.back().isNull()==false)//如果不是无效节点
+				Disconnect(connectedVertexes.back());//Disconnect()会清除本节点
+			else
+				connectedVertexes.pop_back();
+		}
 		emit sig_Cleared(this);
 	}
 	//释放，释放所有成员为空，成为初始状态
@@ -111,7 +116,7 @@ public:
 
 		disconnect();
 		connectedVertexes.clear();
-		gui = nullptr;
+		//gui = nullptr;
 		emit sig_Released(this);
 	}
 
@@ -214,7 +219,7 @@ public:
 	};
 
 	AlgGraphNode(QObject*parent, QThreadPool&pool);
-	virtual ~AlgGraphNode() {}
+	virtual ~AlgGraphNode() { qDebug() << objectName() << __FUNCTION__; }
 
 	virtual void Init();//初始化一些参数，如果初始化后将_isUnchange设为true，则不能更改设定
 	virtual void Reset();//重置运行状态，清除所有运行时参数（运行后可变的参数）
@@ -240,7 +245,7 @@ public:
 	void Stop(bool isStop);
 
 	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
-	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
+	const QHash<QString, QPointer<AlgGraphVertex>>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
@@ -252,12 +257,31 @@ signals:
 	void sig_OutputFinished(AlgGraphNode*node);//输出结束
 
 protected:
+	//用于迭代处理_inputVertex和_outputVertex的模板函数，func是lambda表达式。函数将依次迭代vtxs中元素，如果不存在会输出错误并删除
+	//示例：_ProcessVertex(_inputVertex,[this](AlgGraphVertex*vertex){vertex->Reset();})
+	template<typename F>	
+	bool _ProcessVertex(QHash<QString, QPointer<AlgGraphVertex>>&vtxs, F const&func)
+	{
+		for (auto it = vtxs.begin(); it != vtxs.end();)
+		{
+			if (it->isNull() == false)
+			{
+				func(*it);
+				++it;
+			}
+			else
+			{
+				qDebug() << __FUNCTION__ << it.key() << "Not exist";
+				it = vtxs.erase(it);
+			}
+		}
+	}
 	virtual QVariantHash _LoadInput();/*自定义读取输入，默认直接将数据从Vertex当中复制一份，以免运行过程中输入被修改*/
 	virtual QVariantHash _Run(QVariantHash data);//主要的运行部分，【将在另一个线程中运行】
 	virtual void _LoadOutput(QVariantHash result);/*自定义加载输出，默认直接将数据从临时数据中加载到输出中*/
 
-	QHash<QString, AlgGraphVertex*>_inputVertex;//输入节点
-	QHash<QString, AlgGraphVertex*>_outputVertex;//输出节点
+	QHash<QString, QPointer<AlgGraphVertex>>_inputVertex;//输入节点
+	QHash<QString, QPointer<AlgGraphVertex>>_outputVertex;//输出节点
 
 	QFutureWatcher<QVariantHash> _result;//程序运行观测器
 	QThreadPool&_pool;//使用的线程池
@@ -270,7 +294,7 @@ protected:
 	std::atomic_bool _pause = false;//暂停标志
 	std::atomic_bool _stop = false;//结束标志
 
-	GuiGraphNode* _gui = nullptr;	
+	QPointer<GuiGraphNode> _gui = nullptr;	
 };
 
 class AlgGraphNode_Input
@@ -330,7 +354,7 @@ class GuiGraphItemArrow
 	:public QGraphicsLineItem
 {
 public:
-	GuiGraphItemArrow(const QLineF &line, QGraphicsItem*parent) :QGraphicsLineItem(line, parent) {}
+	//GuiGraphItemArrow(const QLineF &line, QGraphicsItem*parent) :QGraphicsLineItem(line, parent) {}
 	GuiGraphItemArrow(const GuiGraphItemVertex*src, const GuiGraphItemVertex*dst)
 		:QGraphicsLineItem(nullptr), srcVertex(src), dstVertex(dst)
 	{
@@ -339,11 +363,16 @@ public:
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
 
+	void CheckVertex()
+	{
+		if ((srcVertex.isNull() == true || dstVertex.isNull() == true) && scene() != nullptr)
+			scene()->removeItem(this);
+	}
 	void updatePosition();
 	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
 
-	const GuiGraphItemVertex*srcVertex = nullptr, *dstVertex = nullptr;//始末Vertex
+	QPointer<const GuiGraphItemVertex>srcVertex, dstVertex;//始末Vertex
 protected:
 
 };
@@ -417,7 +446,7 @@ public:
 			//	_nodeItem->scene()->removeItem(_nodeItem);
 			delete _nodeItem;
 		}
-		if (_panel != nullptr)
+		if (_panel.isNull() == false)
 			delete _panel;
 	}
 	QGraphicsItem* InitApperance();
@@ -451,7 +480,7 @@ protected:
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 
 	GuiGraphItemNode* _nodeItem=nullptr;//在场景中绘制和交互的物体
-	QWidget* _panel;//面板控件，TODO:后面要下放到相应输入输出子类当中
+	QPointer<QWidget> _panel=nullptr;//面板控件，TODO:后面要下放到相应输入输出子类当中
 };
 
 class GuiGraphNode_Input
@@ -500,7 +529,7 @@ protected:
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void keyPressEvent(QKeyEvent *event) override;
 
-	GuiGraphItemArrow*arrow = nullptr;
+	QGraphicsLineItem*arrow = nullptr;
 };
 
 class GraphView
@@ -544,7 +573,7 @@ private:
 	Ui::TestAnythingClass ui;
 	GraphScene _scene;
 	QList<AlgGraphNode*>_nodes;
-	QList<GuiGraphItemArrow*>_arrows;
+	QList<QPointer<GuiGraphItemArrow>>_arrows;
 
 	QGraphicsItem*selectedItem = nullptr;
 
