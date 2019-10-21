@@ -16,8 +16,6 @@ TestAnything::TestAnything(QWidget *parent)
 	connect(ui.pushButton_NodeInput, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode(this, _pool);
-		node->setObjectName(QString("input") + QString::number(_nodes.size()));
-
 		AddNode(*node, new GuiGraphNode(*node, _scene), QPointF(-100, 0));
 	});
 	connect(ui.pushButton_7, &QPushButton::clicked, this, [this](bool b)
@@ -25,7 +23,9 @@ TestAnything::TestAnything(QWidget *parent)
 		if (_nodes.size() > 0)
 		{
 			auto node = _nodes[0];
-			delete node;
+			auto vtxs = node->GetVertexes(true);
+			if (vtxs.size() > 0)
+				delete vtxs[vtxs.keys()[0]];
 		}
 	});
 	connect(ui.pushButton_5, &QPushButton::clicked, this, [this](bool b)
@@ -35,7 +35,6 @@ TestAnything::TestAnything(QWidget *parent)
 
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
 }
-
 TestAnything::~TestAnything()
 {
 	for (auto n : _nodes)
@@ -47,6 +46,9 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 {
 	//AlgGraphNode初始化
 	assert(_nodes.contains(&node) == false);
+	if(node.objectName().isEmpty()==true)
+		node.SetName(node.metaObject()->className()+QString::number(_nodes.size()));//TODO:自动命名	
+
 	node.Init();
 	//Gui初始化
 	if (guiNode != nullptr)
@@ -57,9 +59,9 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 	{
 		_nodes.removeOne(node);
 	}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
+
 	return node;
 }
-
 GuiGraphNode* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphNode*guiNode, QPointF center /*= QPointF(0, 0)*/)
 {
 	node.AttachGui(guiNode);
@@ -74,6 +76,11 @@ void TestAnything::RemoveNode(AlgGraphNode*node)
 	delete node;	
 }
 
+void TestAnything::RemoveVertex(AlgGraphVertex*vertex)
+{
+	delete vertex;
+}
+
 void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 {
 	for (auto item : items)
@@ -82,6 +89,10 @@ void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 		{
 		case GuiGraphItemNode::Type:
 			RemoveNode(const_cast<AlgGraphNode*> (&((qgraphicsitem_cast<GuiGraphItemNode*>(item))->_holder._node)));
+			break;
+		case GuiGraphItemVertex::Type:
+			RemoveVertex(const_cast<AlgGraphVertex*>(&(qgraphicsitem_cast<GuiGraphItemVertex*>(item))->_vertex));//TODO:以后改成右键菜单删除
+			break;
 		default:
 			break;
 		}
@@ -104,7 +115,10 @@ AlgGraphNode::~AlgGraphNode()
 
 void AlgGraphNode::Init()
 {
-
+	AddVertex("in1", "in1", true);
+	AddVertex("in2", "in2", true);
+	AddVertex("out1", "out1", false);
+	AddVertex("out2", "out2", false);
 }
 void AlgGraphNode::Reset()
 {
@@ -117,19 +131,44 @@ void AlgGraphNode::Release()
 
 AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, bool isInput)
 {
-	throw __FUNCTION__"Not Implement!";
+	AlgGraphVertex* pv;
+	assert(_inputVertex.contains(name) == false && _outputVertex.contains(name) == false);
+	QString newName = name;//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
+	if (isInput == true)
+	{
+		pv = new AlgGraphVertex_Input(*this, newName);
+		_inputVertex.insert(newName, pv);
+		connect(pv, &AlgGraphVertex::sig_Activated, this, &AlgGraphNode::Activate);
+		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
+		{
+			_inputVertex.remove(vertex->objectName());
+		}, Qt::DirectConnection);
+	}
+	else
+	{
+		pv = new AlgGraphVertex_Output(*this, newName);
+		_outputVertex.insert(newName, pv);
+		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
+		{
+			_outputVertex.remove(vertex->objectName());
+		}, Qt::DirectConnection);
+	}
+	pv->defaultData = defaultValue;
+
+	return pv;
 }
 QHash<QString, AlgGraphVertex*> AlgGraphNode::AddVertex(QHash<QString, QVariant>initTbl, bool isInput)
 {
 	throw __FUNCTION__"Not Implement!";
 }
-void AlgGraphNode::RemoveVertex(QString name)
-{
 
-}
-void AlgGraphNode::RemoveVertex(QStringList names)
+void AlgGraphNode::RemoveVertex(QString name, bool isInput)
 {
-
+	auto &vtxs = isInput ? _inputVertex : _outputVertex;
+	assert(vtxs.contains(name) == true);
+	auto vtx = vtxs[name];
+	vtxs.remove(name);
+	delete vtx;
 }
 
 void AlgGraphNode::ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName)
@@ -176,6 +215,11 @@ void AlgGraphNode::Stop(bool isStop)
 
 }
 
+void AlgGraphNode::SetName(QString name)
+{
+	setObjectName(name); if (_gui != nullptr)_gui->setObjectName(name);
+}
+
 QVariantHash AlgGraphNode::_LoadInput()
 {
 	throw __FUNCTION__"Not Implement!";
@@ -195,6 +239,12 @@ GuiGraphNode::GuiGraphNode(const AlgGraphNode&node, GraphScene&scene)
 	:QObject(const_cast<AlgGraphNode*>(&node)), _node(node),_scene(scene)
 {
 	setObjectName(_node.objectName());
+	connect(&node, &AlgGraphNode::objectNameChanged, this, [this](QString name)
+	{
+		setObjectName(name);
+		if (_nodeItem != nullptr)
+			_nodeItem->SetTitle(name);
+	});
 }
 
 GuiGraphNode::~GuiGraphNode()
@@ -208,14 +258,15 @@ GuiGraphNode::~GuiGraphNode()
 }
 QWidget* GuiGraphNode::InitWidget(QWidget*parent)
 {
-	_panel = new QPlainTextEdit(parent);
-	//connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
-// 		connect(this, &GuiGraphNode::destroyed, this, [this] 
-// 		{
-// 			_nodeItem->scene()->removeItem(_nodeItem); 
-// 			delete _nodeItem;
-// 		});
-	return _panel;
+	throw "Not Implement!";
+// 	_panel = new QPlainTextEdit(parent);
+// 	//connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
+// // 		connect(this, &GuiGraphNode::destroyed, this, [this] 
+// // 		{
+// // 			_nodeItem->scene()->removeItem(_nodeItem); 
+// // 			delete _nodeItem;
+// // 		});
+// 	return _panel;
 }
 #pragma endregion GuiGraphNode
 #pragma region GuiGraphItem
@@ -227,7 +278,27 @@ GuiGraphItemNode* GuiGraphNode::InitApperance(QPointF center /*= QPointF(0, 0)*/
 		_nodeItem = nullptr;
 	}
 	_nodeItem = new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr, *this);
-	_nodeItem->InitApperance();	
+	for (auto vtx : _node.GetVertexes(true)) 
+	{
+		auto vtxItem = new GuiGraphItemVertex(_nodeItem, *vtx);
+		connect(vtx, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
+		{
+			delete _nodeItem->_inputVertexItem.take(vertex);
+			//_nodeItem->Refresh();//TODO:重设后变混乱，需要研究
+		});
+		_nodeItem->_inputVertexItem.insert(vtx, vtxItem);
+	}
+	for (auto vtx : _node.GetVertexes(false))
+	{
+		auto vtxItem = new GuiGraphItemVertex(_nodeItem, *vtx);
+		connect(vtx, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
+		{
+			delete _nodeItem->_outputVertexItem.take(vertex);
+			//_nodeItem->Refresh();
+		});
+		_nodeItem->_outputVertexItem.insert(vtx, vtxItem);
+	}
+	_nodeItem->Refresh();
 
 // 	int h = title->boundingRect().height();
 // 	for (auto vtx : _node.GetVertexes(true))
@@ -268,12 +339,21 @@ GuiGraphItemNode::~GuiGraphItemNode()
 	_holder.DetachItem();
 }
 
-void GuiGraphItemNode::InitApperance()
+void GuiGraphItemNode::Refresh()
 {
-	auto box = boundingRect();
-	QGraphicsTextItem*title = new QGraphicsTextItem(this);
-	title->setPlainText(_holder.objectName());
-	title->setPos(title->mapFromParent(box.width() / 2 - title->boundingRect().width() / 2, 0));
+	SetTitle(_holder.objectName());
+	int h = _title.boundingRect().height();
+	for (auto vtxItem : _inputVertexItem)
+	{
+		vtxItem->setPos(vtxItem->mapFromParent(0, h));
+		h += vtxItem->boundingRect().height();
+	}
+	h = _title.boundingRect().height();
+	for (auto vtxItem : _outputVertexItem)
+	{
+		vtxItem->setPos(vtxItem->mapFromParent(boundingRect().width() - vtxItem->boundingRect().width(), h));
+		h += vtxItem->boundingRect().height();
+	}
 }
 
 #pragma endregion GuiGraphItem
@@ -284,5 +364,26 @@ void GraphScene::keyPressEvent(QKeyEvent *event)
 	{
 		auto selects = this->selectedItems();
 		emit sig_RemoveItems(selects);
+	}
+}
+
+QRectF GuiGraphItemVertex::boundingRect() const
+{
+	QFontMetrics fm(scene() != nullptr ? (scene()->font()) : (QApplication::font()));
+	return QRectF(0, 0, fm.width(_vertex.objectName()), fm.height());
+}
+
+void GuiGraphItemVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
+{
+	painter->drawText(0, boundingRect().height(), _vertex.objectName()/*,QTextOption(Qt::AlignmentFlag::AlignCenter)*/);
+	if (isSelected() == true)
+		painter->setBrush(Qt::Dense5Pattern);
+	if (_mouseState == 1)
+		painter->drawRect(boundingRect());
+	else
+	{
+		painter->setPen(QPen(QColor(200, 200, 200)));
+		//painter->setBrush(QBrush(QColor(100, 100, 100), Qt::BrushStyle::SolidPattern));
+		painter->drawRect(boundingRect());
 	}
 }

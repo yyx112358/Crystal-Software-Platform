@@ -50,82 +50,37 @@ public:
 		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {
 		setObjectName(name);
 	}
-	virtual ~AlgGraphVertex() { Release(); }
+	virtual ~AlgGraphVertex() { qDebug() << objectName() << __FUNCTION__; emit sig_Destroyed(&node, this); }
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
-	void Activate(QVariant var, bool isActivate = true)
-	{
-		if (isEnabled == true)
-		{
-			emit sig_ActivateBegin();
-			for (auto f : assertFunctions)
-				if (f(var) == false)
-					throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
-
-			_Activate(var, isActivate);
-			emit sig_ActivateEnd();
-		}
-	}
+	void Activate(QVariant var, bool isActivate = true);
 	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
-	void Connect(AlgGraphVertex*dstVertex)
-	{
-		assert(dstVertex != nullptr);
-		connectedVertexes.append(dstVertex);
-		dstVertex->connectedVertexes.append(this);
-		emit sig_ConnectionAdded(this, dstVertex);
-	}
-	void Disconnect(AlgGraphVertex*another)
-	{
-		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
-		{
-			another->connectedVertexes.removeAll(this);
-			if (disconnect(another) == true)//清除连接
-				emit sig_ConnectionRemoved(this, another);
-			/*else */if (another->disconnect(this) == true)
-				emit sig_ConnectionRemoved(another, this);
-		}
-	}
+	void Connect(AlgGraphVertex*dstVertex);
+	void Disconnect(AlgGraphVertex*another);
 	//重置，主要是清除运行时状态（图运行后会改变的，主要是数据及激活位）
-	virtual void Reset()
-	{
-		data.clear();
-		isActivated = false;
-		emit sig_Reseted(this);
-	}
+	virtual void Reset(){}
 	//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点connectedVertexes）
 	//TODO:是否加入isUnchange参数，设定其它参数是否可变？
-	virtual void Clear()
-	{
-		Reset();
-		isEnabled = true;
-		while (connectedVertexes.size() > 0)//清除connectedVertexes
-		{
-			if (connectedVertexes.back().isNull() == false)//如果不是无效节点
-				Disconnect(connectedVertexes.back());//Disconnect()会清除本节点
-			else
-				connectedVertexes.pop_back();
-		}
-		emit sig_Cleared(this);
-	}
-	//释放，释放所有成员为空，成为初始状态
-	virtual void Release()
-	{
-		Clear();
-		defaultData.clear();
-		additionInfo.clear();
-		assertFunctions.clear();
+	virtual void Clear(){}
+// 	//释放，释放所有成员为空，成为初始状态
+// 	virtual void Release()
+// 	{
+// 		Clear();
+// 		defaultData.clear();
+// 		additionInfo.clear();
+// 		assertFunctions.clear();
+// 
+// 		disconnect();
+// 		connectedVertexes.clear();
+// 		if (gui != nullptr)
+// 			delete gui;
+// 
+// 		emit sig_Released(this);
+// 	}
 
-		disconnect();
-		connectedVertexes.clear();
-		if (gui != nullptr)
-			delete gui;
-
-		emit sig_Released(this);
-	}
-
-	virtual QStringList Write()const { throw "Not Implement"; }//TODO:持久化，保存节点信息和结构（*是否保存数据？）
-	virtual void Read(QStringList) { throw "Not Implement"; }//TODO:从持久化信息中恢复
-	virtual QString GetGuiAdvice()const { return "normal"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
+	virtual QStringList Serilize()const { throw "Not Implement!"; }//TODO:持久化，保存节点信息和结构（*是否保存数据？）
+	virtual void Deserialize(QStringList) { throw "Not Implement!"; }//TODO:从持久化信息中恢复
+	virtual QString GetGuiAdvice()const { throw "Not Implement!"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
 
 	QVariant data;//数据
 	QVariant defaultData;//默认值
@@ -140,7 +95,7 @@ public:
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
 
-	GuiGraphItemVertex*gui = nullptr;//连接的图形
+	//GuiGraphVertex*gui = nullptr;//连接的图形
 signals:
 	void sig_ActivateBegin();//激活开始
 	void sig_Activated(QVariant var, bool is_Activated);//激活信号，可用来激活下一个节点
@@ -151,24 +106,13 @@ signals:
 	void sig_Reseted(AlgGraphVertex*);//重置成功
 	void sig_Cleared(AlgGraphVertex*);//清空成功
 	void sig_Released(AlgGraphVertex*);//释放成功
+
+	void sig_Destroyed(AlgGraphNode*node,AlgGraphVertex*vertex);
 protected:
 	//自定义激活部分，
 	//通过后，isAct为true【存储数据】，激活当前Vertex，该Vertex会【发送sig_Activated()】进一步激活；
 	//false则【清空数据】，且【不会发送】sig_Activated()进一步激活
-	virtual void _Activate(QVariant var, bool isAct)
-	{
-		if (isAct == true)
-		{
-			data = var;
-			isActivated = true;
-			emit sig_Activated(var, true);
-		}
-		else
-		{
-			data.clear();
-			isActivated = false;
-		}
-	}
+	virtual void _Activate(QVariant var, bool isAct){}
 };
 class AlgGraphVertex_Input
 	:public AlgGraphVertex
@@ -191,7 +135,7 @@ class AlgGraphVertex_Output
 	Q_OBJECT
 public:
 	AlgGraphVertex_Output(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
-	virtual ~AlgGraphVertex_Output() { Release(); }
+	virtual ~AlgGraphVertex_Output() { }
 
 	virtual void _Activate(QVariant var, bool isNow)//isNow，是否立刻发送【否则只存数据不发送】。与基类中相比，激活后必定自动清空
 	{
@@ -233,8 +177,8 @@ public:
 
 	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//添加默认节点，并连接输入节点的sig_Activated()信号
 	virtual QHash<QString,AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
-	virtual void RemoveVertex(QString name);
-	virtual void RemoveVertex(QStringList names);
+	virtual void RemoveVertex(QString name, bool isInput);
+	virtual void RemoveVertex(QStringList names, bool isInput){}
 	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
 	virtual void DisconnectVertex(QString vertexName);
 	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
@@ -248,6 +192,7 @@ public:
 	void Pause(bool isPause);
 	void Stop(bool isStop);
 
+	void SetName(QString name);
 	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
 	void DetachGui() { _gui = nullptr; }//TODO:检查GuiGraphNode析构后的安全性
 	bool isHasGui()const { return _gui != nullptr; }
@@ -283,6 +228,8 @@ protected:
 			}
 		}
 	}
+
+
 	virtual QVariantHash _LoadInput();/*自定义读取输入，默认直接将数据从Vertex当中复制一份，以免运行过程中输入被修改*/
 	virtual QVariantHash _Run(QVariantHash data);//主要的运行部分，【将在另一个线程中运行】
 	virtual void _LoadOutput(QVariantHash result);/*自定义加载输出，默认直接将数据从临时数据中加载到输出中*/
@@ -371,12 +318,11 @@ public:
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
 
-	void updatePosition();
+	void updatePosition() { throw "Not Implement"; }
 	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
 
 	QPointer<const AlgGraphVertex>srcVertex, dstVertex;//始末Vertex
-protected:
 
 };
 class GuiGraphItemVertex
@@ -384,10 +330,13 @@ class GuiGraphItemVertex
 {
 public:
 	GuiGraphItemVertex(QGraphicsItem*parent, const AlgGraphVertex&vertex)
-		:QGraphicsItem(parent), _vertex(&vertex) {
+		:QGraphicsItem(parent), _vertex(vertex) {
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
+		setAcceptHoverEvents(true);
+		setFlag(QGraphicsItem::ItemIsSelectable);
+		setZValue(parent->zValue() + 0.1);
 	}
-	virtual ~GuiGraphItemVertex() { qDebug()<<_vertex->objectName() << __FUNCTION__; }
+	virtual ~GuiGraphItemVertex() { qDebug()<<_vertex.objectName() << __FUNCTION__; }
 	enum{Type=VERTEX_TYPE};
 	virtual int type()const { return Type; }
 
@@ -406,8 +355,7 @@ public:
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
-	QPointer<const AlgGraphVertex>_vertex;
-protected:
+	const AlgGraphVertex&_vertex;
 
 	int _mouseState = 0;
 	QList<QSharedPointer<GuiGraphItemArrow>>_arrows;
@@ -424,22 +372,12 @@ protected:
 	virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override { _mouseState = 0; QGraphicsItem::hoverLeaveEvent(event); }
 
 };
-class GuiGraphVertex
-{
-public:
-	GuiGraphVertex();
-	virtual ~GuiGraphVertex();
-
-private:
-
-};
-
 class GuiGraphItemNode
 	:public QGraphicsRectItem
 {
 public:
 	GuiGraphItemNode(QRectF area, QGraphicsItem*parent,GuiGraphNode&holder) 
-		:QGraphicsRectItem(area, parent),_holder(holder)
+		:QGraphicsRectItem(area, parent),_holder(holder),_title(this)
 	{
 		setTransformOriginPoint(boundingRect().center());
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
@@ -450,10 +388,16 @@ public:
 	enum { Type = NODE_TYPE };
 	virtual int type()const { return Type; }
 
-	virtual void InitApperance();
+	virtual void Refresh();
+	void SetTitle(QString name) {
+		_title.setPlainText(name);	
+		_title.setPos(_title.mapToParent(boundingRect().width() / 2 - _title.boundingRect().width() / 2, 0));
+	}
 
 	GuiGraphNode&_holder;
-protected:
+	QGraphicsTextItem _title;
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 };
 //Node在Gui的控制器，更多的起到一个在AlgGraphNode和GuiGraphItemNode之间中转的作用
 class GuiGraphNode
@@ -564,6 +508,7 @@ public:
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
 	
 	void RemoveNode(AlgGraphNode*node);
+	void RemoveVertex(AlgGraphVertex*vertex);
 	void RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst);
 	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
 	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
@@ -576,7 +521,6 @@ private:
 	Ui::TestAnythingClass ui;
 	GraphScene _scene;
 	QList<AlgGraphNode*>_nodes;
-	QList<QPointer<GuiGraphItemArrow>>_arrows;
 
 	QGraphicsItem*selectedItem = nullptr;
 
