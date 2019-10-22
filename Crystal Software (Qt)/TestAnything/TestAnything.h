@@ -29,6 +29,7 @@ class AlgGraphVertex_Input;
 class AlgGraphNode;
 
 class GuiGraphItemVertex;
+class GuiGraphItemNode;
 class GuiGraphVertex;
 class GuiGraphNode;
 
@@ -95,7 +96,6 @@ public:
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
 
-	//GuiGraphVertex*gui = nullptr;//连接的图形
 signals:
 	void sig_ActivateBegin();//激活开始
 	void sig_Activated(QVariant var, bool is_Activated);//激活信号，可用来激活下一个节点
@@ -196,7 +196,9 @@ public:
 	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
 	void DetachGui() { _gui = nullptr; }//TODO:检查GuiGraphNode析构后的安全性
 	bool isHasGui()const { return _gui != nullptr; }
+	const GuiGraphNode*GetGui()const { return _gui; }
 	const QHash<QString, QPointer<AlgGraphVertex>>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
+	
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
@@ -329,14 +331,8 @@ class GuiGraphItemVertex
 	:public QGraphicsItem
 {
 public:
-	GuiGraphItemVertex(QGraphicsItem*parent, const AlgGraphVertex&vertex)
-		:QGraphicsItem(parent), _vertex(vertex) {
-		setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
-		setAcceptHoverEvents(true);
-		setFlag(QGraphicsItem::ItemIsSelectable);
-		setZValue(parent->zValue() + 0.1);
-	}
-	virtual ~GuiGraphItemVertex() { qDebug()<<_vertex.objectName() << __FUNCTION__; }
+	GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVertex&vertex, bool isInput);
+	virtual ~GuiGraphItemVertex();
 	enum{Type=VERTEX_TYPE};
 	virtual int type()const { return Type; }
 
@@ -356,8 +352,11 @@ public:
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
 	const AlgGraphVertex&_vertex;
+	GuiGraphItemNode&_nodeItem;
 
+	const bool _isInput;
 	int _mouseState = 0;
+
 	QList<QSharedPointer<GuiGraphItemArrow>>_arrows;
 
 	virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value)
@@ -370,6 +369,9 @@ public:
 	}
 	virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override { _mouseState = 1; QGraphicsItem::hoverEnterEvent(event); }
 	virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override { _mouseState = 0; QGraphicsItem::hoverLeaveEvent(event); }
+
+protected:
+	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 };
 class GuiGraphItemNode
@@ -391,9 +393,14 @@ public:
 	virtual void Refresh();
 	void SetTitle(QString name) {
 		_title.setPlainText(name);	
-		_title.setPos(_title.mapToParent(boundingRect().width() / 2 - _title.boundingRect().width() / 2, 0));
+		_title.setPos(boundingRect().width() / 2 - _title.boundingRect().width() / 2, 0);
 	}
+	
+	void RequestDelete(QGraphicsItem*item)
+	{
 
+	}
+	
 	GuiGraphNode&_holder;
 	QGraphicsTextItem _title;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
@@ -414,6 +421,8 @@ public:
 	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx);
 	GuiGraphItemArrow*AddConnection();
 	void DetachItem() { _nodeItem = nullptr; }
+	void RemoveVertex();
+	const GuiGraphItemNode*GetItem()const { return _nodeItem; }
 
 	virtual QVariant GetData() { throw "NotImplement"; }
 	virtual void SetData(QVariant var) { throw "NotImplement"; }

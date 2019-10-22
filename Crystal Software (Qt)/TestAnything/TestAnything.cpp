@@ -30,7 +30,11 @@ TestAnything::TestAnything(QWidget *parent)
 	});
 	connect(ui.pushButton_5, &QPushButton::clicked, this, [this](bool b)
 	{
-		_scene.clear();
+		if (_nodes.size() > 0)
+		{
+			auto node = _nodes[0]->GetGui()->GetItem();
+			const_cast<GuiGraphItemNode*>(node)->Refresh();
+		}
 	});
 
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
@@ -46,9 +50,7 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 {
 	//AlgGraphNode初始化
 	assert(_nodes.contains(&node) == false);
-	if(node.objectName().isEmpty()==true)
-		node.SetName(node.metaObject()->className()+QString::number(_nodes.size()));//TODO:自动命名	
-
+	
 	node.Init();
 	//Gui初始化
 	if (guiNode != nullptr)
@@ -60,10 +62,14 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= 
 		_nodes.removeOne(node);
 	}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
 
+	if(node.objectName().isEmpty()==true)
+		node.SetName(node.metaObject()->className()+QString::number(_nodes.size()));//TODO:自动命名	
+
 	return node;
 }
 GuiGraphNode* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphNode*guiNode, QPointF center /*= QPointF(0, 0)*/)
 {
+	assert(&node == &guiNode->_node);
 	node.AttachGui(guiNode);
 	connect(guiNode, &GuiGraphNode::sig_Destroyed, &node, &AlgGraphNode::DetachGui, Qt::DirectConnection);//GUI自动解除
 	auto guiItem = guiNode->InitApperance(center);
@@ -122,7 +128,13 @@ void AlgGraphNode::Init()
 }
 void AlgGraphNode::Reset()
 {
-
+	for (auto v : _inputVertex)
+		v->Reset();
+	for (auto v : _outputVertex)
+		v->Reset();
+	_pause = false;
+	_stop = false;
+	//_lock.unlock();//TODO:考虑加锁
 }
 void AlgGraphNode::Release()
 {
@@ -217,7 +229,9 @@ void AlgGraphNode::Stop(bool isStop)
 
 void AlgGraphNode::SetName(QString name)
 {
-	setObjectName(name); if (_gui != nullptr)_gui->setObjectName(name);
+	setObjectName(name); 
+	if (_gui != nullptr)
+		_gui->setObjectName(name);
 }
 
 QVariantHash AlgGraphNode::_LoadInput()
@@ -280,21 +294,21 @@ GuiGraphItemNode* GuiGraphNode::InitApperance(QPointF center /*= QPointF(0, 0)*/
 	_nodeItem = new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr, *this);
 	for (auto vtx : _node.GetVertexes(true)) 
 	{
-		auto vtxItem = new GuiGraphItemVertex(_nodeItem, *vtx);
+		auto vtxItem = new GuiGraphItemVertex(*_nodeItem, *vtx,true);
 		connect(vtx, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
 		{
 			delete _nodeItem->_inputVertexItem.take(vertex);
-			//_nodeItem->Refresh();//TODO:重设后变混乱，需要研究
+			_nodeItem->Refresh();//TODO:重设后变混乱，需要研究
 		});
 		_nodeItem->_inputVertexItem.insert(vtx, vtxItem);
 	}
 	for (auto vtx : _node.GetVertexes(false))
 	{
-		auto vtxItem = new GuiGraphItemVertex(_nodeItem, *vtx);
+		auto vtxItem = new GuiGraphItemVertex(*_nodeItem, *vtx, false);
 		connect(vtx, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
 		{
 			delete _nodeItem->_outputVertexItem.take(vertex);
-			//_nodeItem->Refresh();
+			_nodeItem->Refresh();
 		});
 		_nodeItem->_outputVertexItem.insert(vtx, vtxItem);
 	}
@@ -345,13 +359,13 @@ void GuiGraphItemNode::Refresh()
 	int h = _title.boundingRect().height();
 	for (auto vtxItem : _inputVertexItem)
 	{
-		vtxItem->setPos(vtxItem->mapFromParent(0, h));
+		vtxItem->setPos(0, h);
 		h += vtxItem->boundingRect().height();
 	}
 	h = _title.boundingRect().height();
 	for (auto vtxItem : _outputVertexItem)
 	{
-		vtxItem->setPos(vtxItem->mapFromParent(boundingRect().width() - vtxItem->boundingRect().width(), h));
+		vtxItem->setPos(boundingRect().width() - vtxItem->boundingRect().width(), h);
 		h += vtxItem->boundingRect().height();
 	}
 }
@@ -365,6 +379,20 @@ void GraphScene::keyPressEvent(QKeyEvent *event)
 		auto selects = this->selectedItems();
 		emit sig_RemoveItems(selects);
 	}
+}
+
+GuiGraphItemVertex::GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVertex&vertex, bool isInput) :QGraphicsItem(&parent), _vertex(vertex), _nodeItem(parent), _isInput(isInput)
+{
+	setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
+	setAcceptHoverEvents(true);
+	setFlag(QGraphicsItem::ItemIsSelectable);
+	setZValue(_nodeItem.zValue() + 0.1);
+}
+
+GuiGraphItemVertex::~GuiGraphItemVertex()
+{
+	qDebug() << _vertex.objectName() << __FUNCTION__;
+	
 }
 
 QRectF GuiGraphItemVertex::boundingRect() const
@@ -386,4 +414,13 @@ void GuiGraphItemVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem
 		//painter->setBrush(QBrush(QColor(100, 100, 100), Qt::BrushStyle::SolidPattern));
 		painter->drawRect(boundingRect());
 	}
+}
+
+void GuiGraphItemVertex::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+{
+	QMenu menu;
+	auto paction = menu.addAction("Delete");
+// 	if(menu.exec(event->screenPos())==paction)
+// 		_nodeItem._holder.Re
+	QGraphicsItem::contextMenuEvent(event);
 }
