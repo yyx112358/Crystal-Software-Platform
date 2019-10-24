@@ -31,7 +31,7 @@ class AlgGraphNode;
 class GuiGraphItemVertex;
 class GuiGraphItemNode;
 class GuiGraphVertex;
-class GuiGraphNode;
+class GuiGraphController;
 
 class GraphScene;
 class GraphController;
@@ -51,7 +51,13 @@ public:
 		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {
 		setObjectName(name);
 	}
-	virtual ~AlgGraphVertex() { qDebug() << objectName() << __FUNCTION__; emit sig_Destroyed(&node, this); }
+	virtual ~AlgGraphVertex() 
+	{ 
+		qDebug() << objectName() << __FUNCTION__; 
+		for (auto v : connectedVertexes)
+			Disconnect(v);
+		emit sig_Destroyed(&node, this);;
+	}
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
@@ -83,6 +89,7 @@ public:
 	virtual void Deserialize(QStringList) { throw "Not Implement!"; }//TODO:从持久化信息中恢复
 	virtual QString GetGuiAdvice()const { throw "Not Implement!"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
 
+
 	QVariant data;//数据
 	QVariant defaultData;//默认值
 	QHash<QString, QVariant> additionInfo;//附加信息
@@ -92,6 +99,7 @@ public:
 
 	AlgGraphNode& node;//从属的节点
 	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口
+	GuiGraphItemVertex*gui = nullptr;
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
@@ -193,10 +201,10 @@ public:
 	void Stop(bool isStop);
 
 	void SetName(QString name);
-	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
+	void AttachGui(GuiGraphController*gui) { _gui = gui; }
 	void DetachGui() { _gui = nullptr; }//TODO:检查GuiGraphNode析构后的安全性
 	bool isHasGui()const { return _gui != nullptr; }
-	const GuiGraphNode*GetGui()const { return _gui; }
+	const GuiGraphController*GetGui()const { return _gui; }
 	const QHash<QString, QPointer<AlgGraphVertex>>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
 	
 signals:
@@ -250,7 +258,7 @@ protected:
 	std::atomic_bool _pause = false;//暂停标志
 	std::atomic_bool _stop = false;//结束标志
 
-	QPointer<GuiGraphNode> _gui = nullptr;	
+	QPointer<GuiGraphController> _gui = nullptr;	
 };
 
 class AlgGraphNode_Input
@@ -316,15 +324,19 @@ class GuiGraphItemArrow
 {
 public:
 	//GuiGraphItemArrow(const QLineF &line, QGraphicsItem*parent) :QGraphicsLineItem(line, parent) {}
-	GuiGraphItemArrow(const GuiGraphItemVertex*src, const GuiGraphItemVertex*dst);
+	GuiGraphItemArrow(GuiGraphItemVertex*const src, GuiGraphItemVertex*const dst);
+	virtual ~GuiGraphItemArrow();//删除情况：没有点上、连接失败；对应的GuiItemVertex被删除；对应的Alg
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
+	void RequestDelete();
+	bool isVertexItemOnThis(const GuiGraphItemVertex*vtx)const { return srcVertex == vtx || dstVertex == vtx; }
 
-	void updatePosition() { throw "Not Implement"; }
-	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
+	void updatePosition();
+	//virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
 
-	QPointer<const AlgGraphVertex>srcVertex, dstVertex;//始末Vertex
+	GuiGraphItemVertex*const srcVertex;
+	GuiGraphItemVertex*const dstVertex;//始末Vertex
 
 };
 class GuiGraphItemVertex
@@ -336,15 +348,6 @@ public:
 	enum{Type=VERTEX_TYPE};
 	virtual int type()const { return Type; }
 
-	void AddArrow(GuiGraphItemArrow*arrow) { assert(arrow != nullptr);  _arrows.append(QSharedPointer<GuiGraphItemArrow>(arrow)); }
-	void RemoveArrow(GuiGraphItemArrow*arrow) { _arrows.removeOne(QSharedPointer<GuiGraphItemArrow>(arrow)); }
-// 	void RemoveArrow(AlgGraphVertex*another) 
-// 	{ 
-// 		int i = 0;
-// 		while(i<_arrows.size())
-// 			if(_arrows[i]->srcVertex==another||_arrows[i])
-// 	}
-
 	virtual QPointF ArrowAttachPosition()const//箭头连接点位置 
 	{ return boundingRect().center(); }
 
@@ -355,9 +358,9 @@ public:
 	GuiGraphItemNode&_nodeItem;
 
 	const bool _isInput;
-	int _mouseState = 0;
+	char _mouseState = 0;
 
-	QList<QSharedPointer<GuiGraphItemArrow>>_arrows;
+	QList<GuiGraphItemArrow*>_arrows;
 
 	virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value)
 	{
@@ -378,8 +381,8 @@ class GuiGraphItemNode
 	:public QGraphicsRectItem
 {
 public:
-	GuiGraphItemNode(QRectF area, QGraphicsItem*parent,GuiGraphNode&holder) 
-		:QGraphicsRectItem(area, parent),_holder(holder),_title(this)
+	GuiGraphItemNode(QRectF area, QGraphicsItem*parent,GuiGraphController&holder) 
+		:QGraphicsRectItem(area, parent),controller(holder),_title(this)
 	{
 		setTransformOriginPoint(boundingRect().center());
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
@@ -396,30 +399,26 @@ public:
 		_title.setPos(boundingRect().width() / 2 - _title.boundingRect().width() / 2, 0);
 	}
 	
-	void RequestDelete(QGraphicsItem*item)
-	{
-
-	}
-	
-	GuiGraphNode&_holder;
+	GuiGraphController&controller;
 	QGraphicsTextItem _title;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 };
 //Node在Gui的控制器，更多的起到一个在AlgGraphNode和GuiGraphItemNode之间中转的作用
-class GuiGraphNode
+class GuiGraphController
 	:public QObject
 {
 	Q_OBJECT
 public:
-	GuiGraphNode(const AlgGraphNode&node,GraphScene&scene);
-	virtual ~GuiGraphNode();
+	GuiGraphController(const AlgGraphNode&node,GraphScene&scene);
+	virtual ~GuiGraphController();
 	virtual GuiGraphItemNode* InitApperance(QPointF center = QPointF(0, 0), QRectF size = QRectF(0, 0, 100, 100));//根据AlgGraphNode的信息初始化GuiGraphItemNode
 
 	virtual QWidget* InitWidget(QWidget*parent);
 
 	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx);
-	GuiGraphItemArrow*AddConnection();
+	static GuiGraphItemArrow*AddArrow(GuiGraphItemArrow*arrow);
+
 	void DetachItem() { _nodeItem = nullptr; }
 	void RemoveVertex();
 	const GuiGraphItemNode*GetItem()const { return _nodeItem; }
@@ -429,13 +428,9 @@ public:
 
 	const AlgGraphNode& _node;//对相应AlgGraphNode的常引用，只读不可写
 signals:
-	void sig_Destroyed(GuiGraphNode*node);//析构前发出的信号
+	void sig_Destroyed(GuiGraphController*node);//析构前发出的信号
 	void sig_ValueChanged();//TODO:后面要下放到相应输入输出子类当中
 protected:	
-	//QHash<QString, const AlgGraphVertex*>_inputVertex;//输入节点
-	//QHash<QString, const AlgGraphVertex*>_outputVertex;//输入节点
-	//QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
-	//QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 
 	GraphScene&_scene;
 	GuiGraphItemNode* _nodeItem=nullptr;//在场景中绘制和交互的物体，其析构时会自动解离
@@ -484,11 +479,11 @@ signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
 protected:
-//	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
-//	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
+	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void keyPressEvent(QKeyEvent *event) override;
 
-	QGraphicsLineItem*arrow = nullptr;
+	GuiGraphItemArrow*arrow = nullptr;
 };
 
 class GraphView
@@ -511,15 +506,15 @@ public:
 	TestAnything(QWidget *parent = Q_NULLPTR);
 	~TestAnything();
 
-	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphNode*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
-	GuiGraphNode* AddGuiNode(AlgGraphNode&node,GuiGraphNode*guiNode, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
+	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphController*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
+	GuiGraphController* AddGuiNode(AlgGraphNode&node,GuiGraphController*guiNode, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
 	
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
 	
 	void RemoveNode(AlgGraphNode*node);
 	void RemoveVertex(AlgGraphVertex*vertex);
 	void RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst);
-	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
+	//void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
 	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
 
 	void slot_Start(bool b);
