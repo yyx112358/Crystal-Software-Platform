@@ -1,4 +1,4 @@
-#include "TestAnything.h"
+ï»¿#include "TestAnything.h"
 #include <QPlainTextEdit>
 #include <QGraphicsSceneMouseEvent>
 
@@ -16,9 +16,9 @@ TestAnything::TestAnything(QWidget *parent)
 	connect(ui.pushButton_NodeInput, &QPushButton::clicked, this, [this](bool b)
 	{
 		auto node = new AlgGraphNode(this, _pool);
-		node->setObjectName(QString("input") + QString::number(_nodes.size()));
+		//node->setObjectName(QString("input") + QString::number(_nodes.size()));
 
-		AddNode(*node, new GuiGraphNode(*node, _scene), QPointF(-100, 0));
+		AddNode(*node, new GuiGraphController(*node, _scene), QPointF(-100, 0));
 	});
 	connect(ui.pushButton_7, &QPushButton::clicked, this, [this](bool b)
 	{
@@ -43,27 +43,31 @@ TestAnything::~TestAnything()
 	_nodes.clear();
 }
 
-AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphNode*guiNode /*= nullptr*/, QPointF center /*= QPointF(0, 0)*/)
+AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphController*guiNode /*= nullptr*/, QPointF center /*= QPointF(0, 0)*/)
 {
-	//AlgGraphNode³õÊ¼»¯
-	assert(_nodes.contains(&node) == false);
+	//AlgGraphNodeåˆå§‹åŒ–
+	assert(_nodes.contains(&node) == false);//é¿å…é‡å¤åŠ å…¥
 	node.Init();
-	//Gui³õÊ¼»¯
+	//Guiåˆå§‹åŒ–
 	if (guiNode != nullptr)
 		AddGuiNode(node, guiNode, center);
-	//Ìí¼Óµ½¿ØÖÆÆ÷¼àÊÓÖÐ
+	//æ·»åŠ åˆ°æŽ§åˆ¶å™¨ç›‘è§†ä¸­
 	_nodes.append(&node);
-	connect(&node, &AlgGraphNode::sig_Destroyed, this, [this](AlgGraphNode*node)//É¾³ýºó×Ô¶¯´Ó_nodesÖÐÉ¾³ý
+	connect(&node, &AlgGraphNode::sig_Destroyed, this, [this](AlgGraphNode*node)//åˆ é™¤åŽè‡ªåŠ¨ä»Ž_nodesä¸­åˆ é™¤
 	{
 		_nodes.removeOne(node);
-	}, Qt::DirectConnection);//×¢Òâ²»ÄÜÁ¬½ÓQObject::destroyedÐÅºÅ£¬ÒòÎª·¢³ö¸ÃÐÅºÅÊ±ºòÅÉÉúÀàÒÑ¾­±»Îö¹¹ÁË
+	}, Qt::DirectConnection);//æ³¨æ„ä¸èƒ½è¿žæŽ¥QObject::destroyedä¿¡å·ï¼Œå› ä¸ºå‘å‡ºè¯¥ä¿¡å·æ—¶å€™æ´¾ç”Ÿç±»å·²ç»è¢«æžæž„äº†
+
+	if (node.objectName().isEmpty() == true)
+		node.setObjectName(node.metaObject()->className() + QString::number(_nodes.size()));//TODO:è‡ªåŠ¨å‘½å	
+
 	return node;
 }
 
-GuiGraphNode* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphNode*guiNode, QPointF center /*= QPointF(0, 0)*/)
+GuiGraphController* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center /*= QPointF(0, 0)*/)
 {
 	node.AttachGui(guiNode);
-	connect(guiNode, &GuiGraphNode::sig_Destroyed, &node, &AlgGraphNode::DetachGui, Qt::DirectConnection);//GUI×Ô¶¯½â³ý
+	//connect(guiNode, &GuiGraphNode::sig_Destroyed, &node, &AlgGraphNode::DetachGui, Qt::DirectConnection);//GUIï¿½Ô¶ï¿½ï¿½ï¿½ï¿½
 	auto guiItem = guiNode->InitApperance(center);
 	return guiNode;
 }
@@ -81,7 +85,8 @@ void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 		switch (item->type())
 		{
 		case GuiGraphItemNode::Type:
-			RemoveNode(const_cast<AlgGraphNode*> (&((qgraphicsitem_cast<GuiGraphItemNode*>(item))->_holder._node)));
+			RemoveNode(const_cast<AlgGraphNode*> (&((qgraphicsitem_cast<GuiGraphItemNode*>(item))->controller._node)));
+			break;
 		default:
 			break;
 		}
@@ -100,6 +105,12 @@ AlgGraphNode::~AlgGraphNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
 	emit sig_Destroyed(this);
+	for (auto v : _inputVertex)
+		delete v;
+	for (auto v : _outputVertex)
+		delete v;
+	if (_gui != nullptr)
+		delete _gui;
 }
 
 void AlgGraphNode::Init()
@@ -191,22 +202,32 @@ void AlgGraphNode::_LoadOutput(QVariantHash result)
 #pragma endregion
 
 #pragma region GuiGraphNode
-GuiGraphNode::GuiGraphNode(const AlgGraphNode&node, GraphScene&scene)
+GuiGraphController::GuiGraphController(const AlgGraphNode&node, GraphScene&scene)
 	:QObject(const_cast<AlgGraphNode*>(&node)), _node(node),_scene(scene)
 {
 	setObjectName(_node.objectName());
+	connect(&node, &AlgGraphNode::objectNameChanged, [this](const QString name)
+	{
+		setObjectName(name);
+		if (_nodeItem != nullptr)
+			_nodeItem->Refresh();
+	});
 }
 
-GuiGraphNode::~GuiGraphNode()
+GuiGraphController::~GuiGraphController()
 {
 	qDebug() << _node.objectName() << __FUNCTION__;
 	emit sig_Destroyed(this);
-	if (_nodeItem != nullptr)
+	if (_nodeItem != nullptr) 
+	{
+		_scene.removeItem(_nodeItem);
 		delete _nodeItem;
+	}
 	if (_panel.isNull() == false)
 		delete _panel;
+	const_cast<AlgGraphNode&>( _node).DetachGui();
 }
-QWidget* GuiGraphNode::InitWidget(QWidget*parent)
+QWidget* GuiGraphController::InitWidget(QWidget*parent)
 {
 	_panel = new QPlainTextEdit(parent);
 	//connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
@@ -219,7 +240,7 @@ QWidget* GuiGraphNode::InitWidget(QWidget*parent)
 }
 #pragma endregion GuiGraphNode
 #pragma region GuiGraphItem
-GuiGraphItemNode* GuiGraphNode::InitApperance(QPointF center /*= QPointF(0, 0)*/, QRectF size /*= QRectF(0, 0, 100, 100)*/)
+GuiGraphItemNode* GuiGraphController::InitApperance(QPointF center /*= QPointF(0, 0)*/, QRectF size /*= QRectF(0, 0, 100, 100)*/)
 {
 	if (_nodeItem != nullptr)
 	{
@@ -227,7 +248,7 @@ GuiGraphItemNode* GuiGraphNode::InitApperance(QPointF center /*= QPointF(0, 0)*/
 		_nodeItem = nullptr;
 	}
 	_nodeItem = new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr, *this);
-	_nodeItem->InitApperance();	
+	_nodeItem->Refresh();	
 
 // 	int h = title->boundingRect().height();
 // 	for (auto vtx : _node.GetVertexes(true))
@@ -264,16 +285,30 @@ GuiGraphItemNode* GuiGraphNode::InitApperance(QPointF center /*= QPointF(0, 0)*/
 
 GuiGraphItemNode::~GuiGraphItemNode()
 {
-	qDebug() << __FUNCTION__;
-	_holder.DetachItem();
+	qDebug() << title.toPlainText() << __FUNCTION__;
+	controller.DetachItem();
 }
 
-void GuiGraphItemNode::InitApperance()
+void GuiGraphItemNode::Refresh()
 {
 	auto box = boundingRect();
-	QGraphicsTextItem*title = new QGraphicsTextItem(this);
-	title->setPlainText(_holder.objectName());
-	title->setPos(title->mapFromParent(box.width() / 2 - title->boundingRect().width() / 2, 0));
+	//æ ‡é¢˜
+	title.setPlainText(controller.objectName());
+	qDebug() << controller.objectName();
+	title.setPos(box.width() / 2 - title.boundingRect().width() / 2, 0);
+
+// 	int h = title.boundingRect().height();
+// 	for (auto vtxItem : _inputVertexItem)
+// 	{
+// 		vtxItem->setPos(0, h);
+// 		h += vtxItem->boundingRect().height();
+// 	}
+// 	h = _title.boundingRect().height();
+// 	for (auto vtxItem : _outputVertexItem)
+// 	{
+// 		vtxItem->setPos(boundingRect().width() - vtxItem->boundingRect().width(), h);
+// 		h += vtxItem->boundingRect().height();
+// 	}
 }
 
 #pragma endregion GuiGraphItem
