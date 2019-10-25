@@ -70,43 +70,43 @@ public:
 	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
-// 		assert(dstVertex != nullptr);
-// 		connectedVertexes.append(dstVertex);
-// 		dstVertex->connectedVertexes.append(this);
-// 		emit sig_ConnectionAdded(this, dstVertex);
+		assert(dstVertex != nullptr);
+		connectedVertexes.append(dstVertex);
+		dstVertex->connectedVertexes.append(this);
+		emit sig_ConnectionAdded(this, dstVertex);
 	}
 	void Disconnect(AlgGraphVertex*another)
 	{
-// 		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
-// 		{
-// 			another->connectedVertexes.removeAll(this);
-// 			if (disconnect(another) == true)//清除连接
-// 				emit sig_ConnectionRemoved(this, another);
-// 			/*else */if (another->disconnect(this) == true)
-// 				emit sig_ConnectionRemoved(another, this);
-// 		}
+		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
+		{
+			another->connectedVertexes.removeAll(this);
+			if (disconnect(another) == true)//清除连接
+				emit sig_ConnectionRemoved(this, another);
+			/*else */if (another->disconnect(this) == true)
+				emit sig_ConnectionRemoved(another, this);
+		}
 	}
 	//重置，主要是清除运行时状态（图运行后会改变的，主要是数据及激活位）
 	virtual void Reset()
 	{
-// 		data.clear();
-// 		isActivated = false;
-// 		emit sig_Reseted(this);
+		data.clear();
+		isActivated = false;
+		emit sig_Reseted(this);
 	}
 	//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点connectedVertexes）
 	//TODO:是否加入isUnchange参数，设定其它参数是否可变？
 	virtual void Clear()
 	{
-// 		Reset();
-// 		isEnabled = true;
-// 		while (connectedVertexes.size() > 0)//清除connectedVertexes
-// 		{
-// 			if (connectedVertexes.back().isNull() == false)//如果不是无效节点
-// 				Disconnect(connectedVertexes.back());//Disconnect()会清除本节点
-// 			else
-// 				connectedVertexes.pop_back();
-// 		}
-// 		emit sig_Cleared(this);
+		Reset();
+		isEnabled = true;
+		while (connectedVertexes.size() > 0)//清除connectedVertexes
+		{
+			if (connectedVertexes.back().isNull() == false)//如果不是无效节点
+				Disconnect(connectedVertexes.back());//Disconnect()会清除本节点
+			else
+				connectedVertexes.pop_back();
+		}
+		emit sig_Cleared(this);
 	}
 	//释放，释放所有成员为空，成为初始状态
 	virtual void Release()
@@ -371,14 +371,15 @@ class GuiGraphItemArrow
 public:
 	//GuiGraphItemArrow(const QLineF &line, QGraphicsItem*parent) :QGraphicsLineItem(line, parent) {}
 	GuiGraphItemArrow(const GuiGraphItemVertex*src, const GuiGraphItemVertex*dst);
+	virtual ~GuiGraphItemArrow();
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
 
-	void updatePosition() {}
+	void updatePosition();
 	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
 
-	QPointer<const AlgGraphVertex>srcVertex, dstVertex;//始末Vertex
+	const GuiGraphItemVertex*srcItemVertex, *dstItemVertex;//始末Vertex
 protected:
 
 };
@@ -467,13 +468,13 @@ class GuiGraphController
 public:
 	GuiGraphController(const AlgGraphNode&node, GraphScene&scene);
 	virtual ~GuiGraphController();
-	virtual GuiGraphItemNode* InitApperance(QPointF center = QPointF(0, 0), QRectF size = QRectF(0, 0, 100, 100));//根据AlgGraphNode的信息初始化GuiGraphItemNode
 
+	virtual GuiGraphItemNode* InitApperance(QPointF center = QPointF(0, 0), QRectF size = QRectF(0, 0, 100, 100));//根据AlgGraphNode的信息初始化GuiGraphItemNode
 	virtual QWidget* InitWidget(QWidget*parent);
 
-	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx);
+	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx, const bool isInput);
 	GuiGraphItemArrow*AddConnection();
-	void DetachItem() { _nodeItem = nullptr; }
+	void DetachItem() { assert(_nodeItem != nullptr); _nodeItem = nullptr; }
 
 	virtual QVariant GetData() { throw "NotImplement"; }
 	virtual void SetData(QVariant var) { throw "NotImplement"; }
@@ -535,11 +536,11 @@ signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
 protected:
-	//	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
-	//	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
+	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
+	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void keyPressEvent(QKeyEvent *event) override;
 
-	QGraphicsLineItem*arrow = nullptr;
+	GuiGraphItemArrow*arrow = nullptr;
 };
 
 class GraphView
