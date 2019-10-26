@@ -54,19 +54,7 @@ public:
 	virtual ~AlgGraphVertex();
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
-	void Activate(QVariant var, bool isActivate = true)
-	{
-// 		if (isEnabled == true)
-// 		{
-// 			emit sig_ActivateBegin();
-// 			for (auto f : assertFunctions)
-// 				if (f(var) == false)
-// 					throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
-// 
-// 			_Activate(var, isActivate);
-// 			emit sig_ActivateEnd();
-// 		}
-	}
+	void Activate(QVariant var, bool isActivate = true);
 	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
@@ -181,6 +169,7 @@ public:
 	AlgGraphVertex_Input(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
 	virtual ~AlgGraphVertex_Input() {  }
 
+	//virtual void Init();
 	enum class Behavior :unsigned char
 	{
 		KEEP = 0,//一直保持激活状态和数据（默认）
@@ -236,8 +225,8 @@ public:
 
 	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//添加默认节点，并连接输入节点的sig_Activated()信号
 	virtual QHash<QString, AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
-	virtual void RemoveVertex(QString name);
-	virtual void RemoveVertex(QStringList names);
+	virtual void RemoveVertex(QString name,bool isInput);
+	virtual void RemoveVertex(QStringList names, bool isInput);
 	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
 	virtual void DisconnectVertex(QString vertexName);
 	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
@@ -254,7 +243,7 @@ public:
 	void AttachGui(GuiGraphController*gui) { assert(_gui == nullptr); _gui = gui; }
 	void DetachGui() { assert(_gui != nullptr); _gui = nullptr; }//TODO:检查GuiGraphNode析构后的安全性
 	bool isHasGui()const { return _gui != nullptr; }
-	const QHash<QString, QPointer<AlgGraphVertex>>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
+	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
@@ -290,8 +279,8 @@ protected:
 	virtual QVariantHash _Run(QVariantHash data);//主要的运行部分，【将在另一个线程中运行】
 	virtual void _LoadOutput(QVariantHash result);/*自定义加载输出，默认直接将数据从临时数据中加载到输出中*/
 
-	QHash<QString, QPointer<AlgGraphVertex>>_inputVertex;//输入节点
-	QHash<QString, QPointer<AlgGraphVertex>>_outputVertex;//输出节点
+	QHash<QString, AlgGraphVertex*>_inputVertex;//输入节点
+	QHash<QString, AlgGraphVertex*>_outputVertex;//输出节点
 
 	QFutureWatcher<QVariantHash> _result;//程序运行观测器
 	QThreadPool&_pool;//使用的线程池
@@ -312,7 +301,7 @@ class AlgGraphNode_Input
 {
 	Q_OBJECT
 public:
-	AlgGraphNode_Input(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Input"); }
+	AlgGraphNode_Input(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
 	virtual ~AlgGraphNode_Input() {}
 
 	virtual void Init() override;
@@ -325,7 +314,7 @@ class AlgGraphNode_Output
 {
 	Q_OBJECT
 public:
-	AlgGraphNode_Output(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Output"); }
+	AlgGraphNode_Output(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
 	virtual ~AlgGraphNode_Output() {}
 
 	virtual void Init() override;
@@ -484,46 +473,42 @@ signals:
 	void sig_Destroyed(GuiGraphController*node);//析构前发出的信号
 	void sig_ValueChanged();//TODO:后面要下放到相应输入输出子类当中
 protected:
-	//QHash<QString, const AlgGraphVertex*>_inputVertex;//输入节点
-	//QHash<QString, const AlgGraphVertex*>_outputVertex;//输入节点
-	//QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//输入节点
-	//QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//输出节点
 
 	GraphScene&_scene;
 	GuiGraphItemNode* _nodeItem = nullptr;//在场景中绘制和交互的物体，其析构时会自动解离
 	QPointer<QWidget> _panel = nullptr;//面板控件，TODO:后面要下放到相应输入输出子类当中
 };
 
-// class GuiGraphNode_Input
-// 	:public GuiGraphNode
-// {
-// 	Q_OBJECT
-// public:
-// 	GuiGraphNode_Input(const AlgGraphNode&node):GuiGraphNode(node){}
-// 	virtual ~GuiGraphNode_Input() {}
-// 	virtual QWidget* InitWidget(QWidget*parent)
-// 	{
-// 		_panel = new QPlainTextEdit(parent);
-// 		connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
-// 		return _panel;
-// 	}
-// 	virtual QVariant GetData() { return (qobject_cast<QPlainTextEdit*>(_panel))->toPlainText(); }
-// 	//virtual void SetData(QVariant var) { throw "NotImplement"; }
-// };
-// class GuiGraphNode_Output
-// 	:public GuiGraphNode
-// {
-// 	Q_OBJECT
-// public:
-// 	GuiGraphNode_Output(const AlgGraphNode&node) :GuiGraphNode(node) {}
-// 	virtual ~GuiGraphNode_Output() {}
-// 	virtual QWidget* InitWidget(QWidget*parent)
-// 	{
-// 		_panel = new QLabel(parent);
-// 		return _panel;
-// 	}
-// 	virtual void SetData(QVariant var) { (qobject_cast<QLabel*>(_panel))->setText(var.toString()); }
-// };
+class GuiGraphController_Input
+	:public GuiGraphController
+{
+	Q_OBJECT
+public:
+	GuiGraphController_Input(const AlgGraphNode&node, GraphScene&scene) :GuiGraphController(node, scene) {}
+	virtual ~GuiGraphController_Input() {}
+	virtual QWidget* InitWidget(QWidget*parent)
+	{
+		_panel = new QPlainTextEdit(parent);
+		connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphController::sig_ValueChanged);
+		return _panel;
+	}
+	virtual QVariant GetData() { return (qobject_cast<QPlainTextEdit*>(_panel))->toPlainText(); }
+	//virtual void SetData(QVariant var) { throw "NotImplement"; }
+};
+class GuiGraphController_Output
+	:public GuiGraphController
+{
+	Q_OBJECT
+public:
+	GuiGraphController_Output(const AlgGraphNode&node, GraphScene&scene) :GuiGraphController(node, scene) {}
+	virtual ~GuiGraphController_Output() {}
+	virtual QWidget* InitWidget(QWidget*parent)
+	{
+		_panel = new QLabel(parent);
+		return _panel;
+	}
+	virtual void SetData(QVariant var) { (qobject_cast<QLabel*>(_panel))->setText(var.toString()); }
+};
 
 class GraphScene
 	:public QGraphicsScene
@@ -565,13 +550,16 @@ public:
 
 	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphController*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
 	GuiGraphController* AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
+	bool AddConnection(AlgGraphNode&srcNode, QString srcNodeName, bool srcIsInput, AlgGraphNode&dstNode, QString dstNodeName, bool dstIsInput);
+	bool AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);//添加连接并显示
+	bool AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);//在GUI上添加连接（实际调用AddConnection(AlgGraphVertex*, AlgGraphVertex*)）
 
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
 
-	void RemoveNode(AlgGraphNode*node);
+	bool RemoveNode(AlgGraphNode*node);
+	bool RemoveVertex(AlgGraphVertex*vertex);
 	void RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst);
-	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
-	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
+
 
 	void slot_Start(bool b);
 

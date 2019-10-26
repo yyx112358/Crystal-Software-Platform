@@ -15,8 +15,23 @@ TestAnything::TestAnything(QWidget *parent)
 	ui.graphicsView->setScene(&_scene);
 	connect(ui.pushButton_NodeInput, &QPushButton::clicked, this, [this](bool b)
 	{
-		auto node = new AlgGraphNode(this, _pool);
-		AddNode(*node, new GuiGraphController(*node, _scene), QPointF(-100, 0));
+		auto node = new AlgGraphNode_Input(this, _pool);
+		auto gui = new GuiGraphController_Input(*node, _scene);
+		AddNode(*node, gui, QPointF(-100, 0));
+		ui.groupBox_Input->layout()->addWidget(gui->InitWidget(ui.groupBox_Input));
+	});
+	connect(ui.pushButton_NodeOutput, &QPushButton::clicked, this, [this](bool b)
+	{
+		auto node = new AlgGraphNode_Output(this, _pool);
+		auto gui = new GuiGraphController_Output(*node, _scene);
+		AddNode(*node, gui, QPointF(100, 0));
+		ui.groupBox_Output->layout()->addWidget(gui->InitWidget(ui.groupBox_Output));
+	});
+	connect(ui.pushButton_NodeAdd, &QPushButton::clicked, this, [this](bool b)
+	{
+		auto node = new AlgGraphNode_Add(this, _pool);
+		auto gui = new GuiGraphController(*node, _scene);
+		AddNode(*node, gui, QPointF(0, 0));
 	});
 	connect(ui.pushButton_7, &QPushButton::clicked, this, [this](bool b)
 	{
@@ -33,7 +48,7 @@ TestAnything::TestAnything(QWidget *parent)
 		_scene.clear();
 	});
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
-	void (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
+	bool (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
 }
@@ -70,61 +85,72 @@ AlgGraphNode& TestAnything::AddNode(AlgGraphNode&node, GuiGraphController*guiNod
 GuiGraphController* TestAnything::AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center /*= QPointF(0, 0)*/)
 {
 	node.AttachGui(guiNode);
-	connect(guiNode, &GuiGraphController::sig_Destroyed, &node, &AlgGraphNode::DetachGui, Qt::DirectConnection);//GUI�Զ����
+	connect(guiNode, &GuiGraphController::sig_Destroyed, &node, &AlgGraphNode::DetachGui, Qt::DirectConnection);//GUI自动解离
 	auto guiItem = guiNode->InitApperance(center);
+
 	return guiNode;
 }
 
-void TestAnything::RemoveNode(AlgGraphNode*node)
+bool TestAnything::RemoveNode(AlgGraphNode*node)
 {
 	_nodes.removeOne(node);
-	delete node;
+	delete node;//TODO:加入删除失败的异常处理
+	return true;
 }
 
-void TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex)
+bool TestAnything::AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex)
 {
-	AddConnection(const_cast<AlgGraphVertex*>(&srcVertex->_vertex),
+	return AddConnection(const_cast<AlgGraphVertex*>(&srcVertex->_vertex),
 		const_cast<AlgGraphVertex*>(&dstVertex->_vertex));
 }
 
-void TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex)
+bool TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex)
 {
 	bool b = srcVertex != dstVertex //不允许指向同一个
 		&& srcVertex->connectedVertexes.contains(dstVertex) == false//不允许重复的连接
 		&& dstVertex->connectedVertexes.contains(srcVertex) == false;
-	assert(b);	if (!b)	return;
+	assert(b);	if (!b)	return false;
 
+	qDebug() << srcVertex->node.objectName()+':'+ srcVertex->objectName() 
+		<< dstVertex->node.objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
 	srcVertex->Connect(dstVertex);
 	connect(srcVertex, &AlgGraphVertex::sig_Activated, dstVertex, &AlgGraphVertex::Activate);
-
+	connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, &TestAnything::RemoveConnection, Qt::UniqueConnection);//【注意这里务必加入UniqueConnection避免重复发送】
 	auto srcItem = srcVertex->gui, dstItem = dstVertex->gui;
 	b = srcItem != nullptr&&dstItem != nullptr;
-	assert(b);	if (!b)	return;
-	connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, [](AlgGraphVertex*src, AlgGraphVertex*dst)
-	{
-		if (src->gui != nullptr&&dst->gui != nullptr)
-		{
-			for (auto a : src->gui->_arrows) 
-			{
-				if (a->dstItemVertex == dst->gui) 
-				{
-					delete a;
-					return;
-				}
-			}
-			throw "Can't Find";
-		}
-	});
+	assert(b);	if (!b)	return true;//注意这里仍然返回true因为连接已成功，只是后面可以添加一个warning来提示
 	auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
 	arrow->setZValue(srcItem->zValue() - 0.2);
 	srcItem->_arrows.append(arrow);
 	dstItem->_arrows.append(arrow);
 	_scene.addItem(arrow);
+	
+	return true;
+}
+
+void TestAnything::RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst)
+{
+	if (src->gui != nullptr&&dst->gui != nullptr)
+	{
+		for (auto a : src->gui->_arrows)
+		{
+			if (a->dstItemVertex == dst->gui)
+			{
+				delete a;
+				return;
+			}
+		}
+		throw "Can't Find";//TODO:改成相应Error
+	}
 }
 
 void TestAnything::slot_Start(bool b)
 {
-
+	for (auto n : _nodes)
+	{
+		n->Reset();
+		n->Activate();
+	}
 }
 
 void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
@@ -138,6 +164,9 @@ void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 			break;
 		case GuiGraphItemVertex::Type:
 			delete const_cast<AlgGraphVertex*> (&((qgraphicsitem_cast<GuiGraphItemVertex*>(item))->_vertex));
+			break;
+		case GuiGraphItemArrow::Type:
+			//RemoveConnection()
 			break;
 		default:
 			break;
@@ -156,6 +185,22 @@ AlgGraphVertex::~AlgGraphVertex()
 		gui = nullptr;
 	}
 }
+
+void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
+{
+	if (isEnabled == true)
+	{
+		qDebug() << node.objectName() + ':' + objectName() << __FUNCTION__;
+		emit sig_ActivateBegin();
+		for (auto f : assertFunctions)
+			if (f(var) == false)
+				throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
+
+		_Activate(var, isActivate);
+		emit sig_ActivateEnd();
+	}
+}
+
 #pragma region AlgGraphNode
 AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool)
 	:QObject(parent), _pool(pool)
@@ -163,10 +208,10 @@ AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool)
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, [this] {emit sig_RunFinished(this); });
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, &AlgGraphNode::Output);
 }
-
 AlgGraphNode::~AlgGraphNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
+
 	emit sig_Destroyed(this);//主要从控制器中解离
 	for (auto v : _inputVertex.values())//【必须先复制一份，不然删除时候会改变QHash】
 		delete v;
@@ -178,44 +223,79 @@ AlgGraphNode::~AlgGraphNode()
 		delete _gui;
 }
 
-void AlgGraphNode::Init()
-{
-	AddVertex("in1", "in1", true);
-	AddVertex("in2", "in2", true);
-	AddVertex("out1", "out1", false);
-	AddVertex("out2", "out2", false);
-}
 void AlgGraphNode::Reset()
 {
+	for (auto v : _inputVertex)
+		v->Reset();
+	for (auto v : _outputVertex)
+		v->Reset();
+	_pause = false;
+	_stop = false;
 
+	//_lock.unlock();//TODO:考虑加锁
 }
 void AlgGraphNode::Release()
 {
+	throw __FUNCTION__"Not Implement!";
+}
 
+void AlgGraphNode::Init()
+{
+	AddVertex("in", "in", true);
+	AddVertex("out", "out", false);
+}
+void AlgGraphNode_Input::Init()
+{
+	AddVertex("out", "out", false);
+}
+void AlgGraphNode_Output::Init()
+{
+	AddVertex("in", "in", true);
+}
+void AlgGraphNode_Add::Init()
+{
+	AddVertex("in1", "in", true);
+	AddVertex("in2", "in", true);
+	AddVertex("out", "out", false);
 }
 
 AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, bool isInput)
 {
+	qDebug() << objectName() + ':' + name << isInput << __FUNCTION__;
 	AlgGraphVertex* pv;
 	assert(_inputVertex.contains(name) == false && _outputVertex.contains(name) == false);
 	QString newName = name;//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	if (isInput == true)
 	{
-		pv = new AlgGraphVertex/*_Input*/(*this, newName);
+		pv = new AlgGraphVertex_Input(*this, newName);
 		_inputVertex.insert(newName, pv);
 		connect(pv, &AlgGraphVertex::sig_Activated, this, &AlgGraphNode::Activate);
 		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
 		{
 			_inputVertex.remove(vertex->objectName());
 		}, Qt::DirectConnection);
+		connect(pv, &AlgGraphVertex::objectNameChanged, this, [this](QString newname)
+		{
+			AlgGraphVertex*vtx = qobject_cast<AlgGraphVertex*>(sender());
+			QString oldname = _inputVertex.key(vtx);
+			_inputVertex.remove(oldname);
+			_inputVertex.insert(newname, vtx);
+		}, Qt::DirectConnection);
 	}
 	else
 	{
-		pv = new AlgGraphVertex/*_Output*/(*this, newName);
+		pv = new AlgGraphVertex_Output(*this, newName);
 		_outputVertex.insert(newName, pv);
 		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
 		{
 			_outputVertex.remove(vertex->objectName());
+		}, Qt::DirectConnection);
+		connect(pv, &AlgGraphVertex::objectNameChanged, this, [this](QString newname)
+		{
+			AlgGraphVertex*vtx = qobject_cast<AlgGraphVertex*>(sender());
+			QString oldname = _outputVertex.key(vtx);
+			_outputVertex.remove(oldname);
+			_outputVertex.insert(newname, vtx);
 		}, Qt::DirectConnection);
 	}
 	pv->defaultData = defaultValue;
@@ -226,70 +306,146 @@ QHash<QString, AlgGraphVertex*> AlgGraphNode::AddVertex(QHash<QString, QVariant>
 {
 	throw __FUNCTION__"Not Implement!";
 }
-void AlgGraphNode::RemoveVertex(QString name)
+void AlgGraphNode::RemoveVertex(QString name, bool isInput)
 {
-
+	auto &vtxs = isInput ? _inputVertex : _outputVertex;
+	//vtxs.remove(name);//TODO:名称出错时候的处理
+	delete vtxs.value(name);
 }
-void AlgGraphNode::RemoveVertex(QStringList names)
+void AlgGraphNode::RemoveVertex(QStringList names, bool isInput)
 {
-
+	auto &vtxs = isInput ? _inputVertex : _outputVertex;
+	for(auto name:names)
+		delete vtxs.value(name);
 }
 
 void AlgGraphNode::ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName)
 {
-
+	throw __FUNCTION__"Not Implement!";
 }
 void AlgGraphNode::DisconnectVertex(QString vertexName)
 {
-
+	throw __FUNCTION__"Not Implement!";
 }
 void AlgGraphNode::DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName)
 {
-
+	throw __FUNCTION__"Not Implement!";
 }
 
 void AlgGraphNode::Write()
 {
-
+	throw __FUNCTION__"Not Implement!";
 }
 void AlgGraphNode::Read()
 {
-
+	throw __FUNCTION__"Not Implement!";
 }
 
 void AlgGraphNode::Activate()
 {
-
+	qDebug() << objectName() << __FUNCTION__;
+	if (_result.isRunning() == false)//运行期间，阻塞输入
+	{
+		for (auto v:_inputVertex)//检查是否全部激活
+			if (v->isActivated == false)
+				return;
+		Run();
+	}
 }
 void AlgGraphNode::Run()
 {
-
+	//TODO:加锁
+	qDebug() << objectName() << __FUNCTION__;
+	auto data = _LoadInput();
+	emit sig_ActivatedFinished(this);
+	//TODO:暂停和退出
+	switch (_mode)
+	{
+	case AlgGraphNode::RunMode::Thread:
+		_result.setFuture(QtConcurrent::run(&_pool, this, &AlgGraphNode::_Run, data));
+		break;
+	case AlgGraphNode::RunMode::Direct:
+		_LoadOutput(_Run(data));
+		emit sig_RunFinished(this);
+		Output();
+		break;
+	case AlgGraphNode::RunMode::Function:
+		throw "Not Implement";
+		break;
+	default:
+		break;
+	}
+	//TODO:暂停和退出
+	//emit sig_ResultReady();
 }
 void AlgGraphNode::Output()
 {
-
+	//TODO:加锁
+	//qDebug() << "====Output====:" << QThread::currentThread();
+	if (_mode != RunMode::Direct)
+		_LoadOutput((_result.future().resultCount() > 0) ? (_result.result()) : (QVariantHash()));
+	//_result.setFuture(QFuture<QVariantHash>());
+	for (auto v:_outputVertex)
+		v->Activate(v->data, true);
+	emit sig_OutputFinished(this);
 }
 
 void AlgGraphNode::Pause(bool isPause)
 {
-
+	_pause = isPause;
 }
 void AlgGraphNode::Stop(bool isStop)
 {
-
+	_stop = isStop;
 }
 
 QVariantHash AlgGraphNode::_LoadInput()
 {
-	throw __FUNCTION__"Not Implement!";
-}
-QVariantHash AlgGraphNode::_Run(QVariantHash data)
-{
-	throw __FUNCTION__"Not Implement!";
+	QHash<QString, QVariant>result;
+	for (auto it = _inputVertex.begin(); it != _inputVertex.end(); ++it)
+		result.insert(it.key(), it.value()->data);
+	return result;
 }
 void AlgGraphNode::_LoadOutput(QVariantHash result)
 {
+	for (auto it = result.begin(); it != result.end(); ++it)
+	{
+		auto vtx = qobject_cast<AlgGraphVertex_Output*>(_outputVertex.value(it.key()));
+		if (vtx != nullptr)
+			vtx->data = it.value();
+		//else GraphWarning();//TODO:警告
+	}
+}
+QVariantHash AlgGraphNode::_Run(QVariantHash data)
+{
+	QThread::msleep(500);
+	return data;
+}
 
+
+
+QVariantHash AlgGraphNode_Input::_Run(QVariantHash data)
+{
+	assert(_gui.isNull() == false);
+	QVariantHash result;
+	result["out"] = _gui->GetData();
+	return result;
+}
+QVariantHash AlgGraphNode_Output::_Run(QVariantHash data)
+{
+	assert(_gui.isNull() == false);
+	for (auto d : data)
+		_gui->SetData(d);
+	return data;
+}
+QVariantHash AlgGraphNode_Add::_Run(QVariantHash data)
+{
+	QVariantHash result;
+	QString s;
+	for (auto d : data)
+		s += d.toString();
+	result["out"] = s;
+	return result;
 }
 #pragma endregion
 
@@ -396,7 +552,8 @@ GuiGraphItemNode* GuiGraphController::InitApperance(QPointF center /*= QPointF(0
 		delete _nodeItem;
 		_nodeItem = nullptr;
 	}
-	_nodeItem = new GuiGraphItemNode(QRectF(0, 0, 100, 100), nullptr, *this);
+	_nodeItem = new GuiGraphItemNode(size, nullptr, *this);
+	_nodeItem->setPos(center);
 	
 	for (auto vtx : _node.GetVertexes(true))
 		AddVertex(vtx, true);
@@ -539,3 +696,4 @@ void GuiGraphItemArrow::updatePosition()
 
 	setLine(QLineF(p1, p2));
 }
+
