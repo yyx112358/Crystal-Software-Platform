@@ -1,15 +1,15 @@
-/*!
- * \file TestAnything.h
- * \date 2019/10/08 11:10
- *
- * \author Yyx112358
- * Contact: user@company.com
- *
- * \brief 
- *
- * TODO: long description
- *
- * \note
+ï»¿/*!
+* \file TestAnything.h
+* \date 2019/10/08 11:10
+*
+* \author Yyx112358
+* Contact: user@company.com
+*
+* \brief
+*
+* TODO: long description
+*
+* \note
 */
 #pragma once
 
@@ -26,11 +26,12 @@
 
 class AlgGraphVertex;
 class AlgGraphVertex_Input;
-class AlgGraphVertex_Input;
 class AlgGraphNode;
 
+class GuiGraphItemArrow;
+class GuiGraphItemNode;
 class GuiGraphItemVertex;
-class GuiGraphNode;
+class GuiGraphController;
 
 class GraphScene;
 class GraphController;
@@ -39,171 +40,22 @@ class GraphWarning;
 
 class TestAnything;
 
-#pragma region AlgGraphNode
-//Ëã·¨½Úµã
-//TODO:ÅÉÉú£º»ù±¾Ëã·¨¡¢³£Á¿¡¢Íâ²¿ÊäÈë¡¢Íâ²¿Êä³ö¡¢º¯Êı¡¢Ìõ¼ş¡¢while¡¢Âß¼­ÔËËã¡¢ÑÓÊ±¡¢Ñ­»·¡¢»º³å
-class AlgGraphNode
-	:public QObject
-{
-	Q_OBJECT
-public:
-	enum class RunMode
-	{
-		Thread,//¶àÏß³Ì·½Ê½¡¾Ä¬ÈÏ¡¿
-		Direct,//¼òµ¥Ö±½Ó·½Ê½£¬²»¿ª¶àÏß³Ì
-		Function,//º¯Êı·½Ê½£¨NodeÄÚ²¿Ç¶Ì×ÁíÒ»¸öGraph£©
-	};
-
-	AlgGraphNode(QObject*parent, QThreadPool&pool);
-	virtual ~AlgGraphNode();
-
-	virtual void Init();//³õÊ¼»¯Ò»Ğ©²ÎÊı£¬Èç¹û³õÊ¼»¯ºó½«_isUnchangeÉèÎªtrue£¬Ôò²»ÄÜ¸ü¸ÄÉè¶¨
-	virtual void Reset();//ÖØÖÃÔËĞĞ×´Ì¬£¬Çå³ıËùÓĞÔËĞĞÊ±²ÎÊı£¨ÔËĞĞºó¿É±äµÄ²ÎÊı£©
-	virtual void Clear() {}
-	virtual void Release();
-	virtual QString GetGuiAdvice()const { return "normal"; }
-
-	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//Ìí¼ÓÄ¬ÈÏ½Úµã£¬²¢Á¬½ÓÊäÈë½ÚµãµÄsig_Activated()ĞÅºÅ
-	virtual QHash<QString,AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
-	virtual void RemoveVertex(QString name);
-	virtual void RemoveVertex(QStringList names);
-	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
-	virtual void DisconnectVertex(QString vertexName);
-	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
-
-	virtual void Write();
-	virtual void Read();
-
-	void Activate();
-	void Run();
-	void Output();
-	void Pause(bool isPause);
-	void Stop(bool isStop);
-
-	void AttachGui(GuiGraphNode*gui) { _gui = gui; }
-	const QHash<QString, QPointer<AlgGraphVertex>>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
-signals:
-	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
-	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
-	void sig_ConnectionAdded();
-	void sig_ConnectionRemoved();
-
-	void sig_ActivatedFinished(AlgGraphNode*node);//½Úµã±»¼¤»î
-	void sig_RunFinished(AlgGraphNode*node);//ÔËĞĞ½áÊø
-	void sig_OutputFinished(AlgGraphNode*node);//Êä³ö½áÊø
-
-protected:
-	//ÓÃÓÚµü´ú´¦Àí_inputVertexºÍ_outputVertexµÄÄ£°åº¯Êı£¬funcÊÇlambda±í´ïÊ½¡£º¯Êı½«ÒÀ´Îµü´úvtxsÖĞÔªËØ£¬Èç¹û²»´æÔÚ»áÊä³ö´íÎó²¢É¾³ı
-	//Ê¾Àı£º_ProcessVertex(_inputVertex,[this](AlgGraphVertex*vertex){vertex->Reset();})
-	template<typename F>	
-	bool _ProcessVertex(QHash<QString, QPointer<AlgGraphVertex>>&vtxs, F const&func)
-	{
-		for (auto it = vtxs.begin(); it != vtxs.end();)
-		{
-			if (it->isNull() == false)
-			{
-				func(*it);
-				++it;
-			}
-			else
-			{
-				qDebug() << __FUNCTION__ << it.key() << "Not exist";
-				it = vtxs.erase(it);
-			}
-		}
-	}
-	virtual QVariantHash _LoadInput();/*×Ô¶¨Òå¶ÁÈ¡ÊäÈë£¬Ä¬ÈÏÖ±½Ó½«Êı¾İ´ÓVertexµ±ÖĞ¸´ÖÆÒ»·İ£¬ÒÔÃâÔËĞĞ¹ı³ÌÖĞÊäÈë±»ĞŞ¸Ä*/
-	virtual QVariantHash _Run(QVariantHash data);//Ö÷ÒªµÄÔËĞĞ²¿·Ö£¬¡¾½«ÔÚÁíÒ»¸öÏß³ÌÖĞÔËĞĞ¡¿
-	virtual void _LoadOutput(QVariantHash result);/*×Ô¶¨Òå¼ÓÔØÊä³ö£¬Ä¬ÈÏÖ±½Ó½«Êı¾İ´ÓÁÙÊ±Êı¾İÖĞ¼ÓÔØµ½Êä³öÖĞ*/
-
-	QHash<QString, QPointer<AlgGraphVertex>>_inputVertex;//ÊäÈë½Úµã
-	QHash<QString, QPointer<AlgGraphVertex>>_outputVertex;//Êä³ö½Úµã
-
-	QFutureWatcher<QVariantHash> _result;//³ÌĞòÔËĞĞ¹Û²âÆ÷
-	QThreadPool&_pool;//Ê¹ÓÃµÄÏß³Ì³Ø
-	QReadWriteLock _lock;//Ëø¡¾¿ÉÄÜ²¢²»ĞèÒª£¬ÒòÎª¶ÁĞ´²ÎÊı¶¼·¢ÉúÔÚÖ÷Ïß³Ì¡¿
-
-	RunMode _mode = RunMode::Thread;//ÔËĞĞ·½Ê½
-
-	std::atomic_bool _isEnable = true;//Ê¹ÄÜ
-	std::atomic_bool _isUnchange = false;//²»¿ÉÔÚ´´½¨ºóĞŞ¸Ä
-	std::atomic_bool _pause = false;//ÔİÍ£±êÖ¾
-	std::atomic_bool _stop = false;//½áÊø±êÖ¾
-
-	QPointer<GuiGraphNode> _gui = nullptr;	
-};
-
-class AlgGraphNode_Input
-	:public AlgGraphNode
-{
-	Q_OBJECT
-public:
-	AlgGraphNode_Input(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Input"); }
-
-	virtual void Init() override;
-protected:
-	virtual QVariantHash _Run(QVariantHash data) override;
-
-};
-class AlgGraphNode_Output
-	:public AlgGraphNode
-{
-	Q_OBJECT
-public:
-	AlgGraphNode_Output(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Output"); }
-
-	virtual void Init() override;
-protected:
-	virtual QVariantHash _Run(QVariantHash data) override;
-
-};
-class AlgGraphNode_Add
-	:public AlgGraphNode
-{
-	Q_OBJECT
-public:
-	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
-	QHash<AlgGraphVertex*, int>idxTbl;//¶ÔÓ¦Ë³Ğò
-	virtual void Init() override;
-protected:
-	virtual QVariantHash _Run(QVariantHash data) override;
-
-};
-class AlgGraphNode_Function
-	:public AlgGraphNode
-{
-	Q_OBJECT
-public:
-
-};
-
-#pragma endregion
 #pragma region AlgGraphVertex
-//AlgµÄVertex£¬Ö÷Òª¸ºÔğÊı¾İ´æ´¢¡¢´«µİ¡¢¼¤»îµÄ¹¤×÷
+//Algçš„Vertexï¼Œä¸»è¦è´Ÿè´£æ•°æ®å­˜å‚¨ã€ä¼ é€’ã€æ¿€æ´»çš„å·¥ä½œ
 class AlgGraphVertex
 	:public QObject
 {
 	Q_OBJECT
 public:
-	AlgGraphVertex(AlgGraphNode&parent,QString name)
-		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {setObjectName(name);}
-	virtual ~AlgGraphVertex() { Release(); }
-
-	//¡¶¼¤»îº¯Êı¡·Èç¹ûÊ¹ÄÜ£¨isEnable==true£©Ê×ÏÈµ÷ÓÃËùÓĞµÄassertFunction×öĞ£Ñé£¬Í¨¹ıºó¡¾µ÷ÓÃ_Activate()º¯Êı¡¿
-	void Activate(QVariant var, bool isActivate = true)
-	{
-		if (isEnabled == true)
-		{
-			emit sig_ActivateBegin();
-			for (auto f : assertFunctions)
-				if (f(var) == false)
-					throw "AssertFail";//TODO:1.¸Ä³É×¨ÓÃµÄGraphError£»2.¼ÓÈëÄ¬ÈÏµÄÀàĞÍÈ·ÈÏ²¿·Ö
-
-			_Activate(var, isActivate);
-			emit sig_ActivateEnd();
-		}
+	AlgGraphVertex(AlgGraphNode&parent, QString name)
+		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {
+		setObjectName(name);
 	}
-	//Á¬½ÓÁ½¸ö½Úµã£¬·½Ïòthis=>dstVertex£¬Ö÷ÒªÊÇĞŞ¸ÄconnectedVertexes²¢Á¬½Óthis=>dstVertexµÄ¼¤»îĞÅºÅ
+	virtual ~AlgGraphVertex();
+
+	//ã€Šæ¿€æ´»å‡½æ•°ã€‹å¦‚æœä½¿èƒ½ï¼ˆisEnable==trueï¼‰é¦–å…ˆè°ƒç”¨æ‰€æœ‰çš„assertFunctionåšæ ¡éªŒï¼Œé€šè¿‡åã€è°ƒç”¨_Activate()å‡½æ•°ã€‘
+	void Activate(QVariant var, bool isActivate = true);
+	//è¿æ¥ä¸¤ä¸ªèŠ‚ç‚¹ï¼Œæ–¹å‘this=>dstVertexï¼Œä¸»è¦æ˜¯ä¿®æ”¹connectedVertexeså¹¶è¿æ¥this=>dstVertexçš„æ¿€æ´»ä¿¡å·
 	void Connect(AlgGraphVertex*dstVertex)
 	{
 		assert(dstVertex != nullptr);
@@ -213,85 +65,87 @@ public:
 	}
 	void Disconnect(AlgGraphVertex*another)
 	{
-		if (connectedVertexes.removeAll(another) > 0)//Èç¹ûÈ·ÊµÁ¬½ÓÁËanother
+		if (connectedVertexes.removeAll(another) > 0)//å¦‚æœç¡®å®è¿æ¥äº†another
 		{
 			another->connectedVertexes.removeAll(this);
-			if (disconnect(another) == true)//Çå³ıÁ¬½Ó
+			if (disconnect(another) == true)//æ¸…é™¤è¿æ¥
 				emit sig_ConnectionRemoved(this, another);
-			/*else */if(another->disconnect(this)==true)
-				emit sig_ConnectionRemoved(another,this);
+			/*else */if (another->disconnect(this) == true)
+				emit sig_ConnectionRemoved(another, this);
 		}
 	}
-	//ÖØÖÃ£¬Ö÷ÒªÊÇÇå³ıÔËĞĞÊ±×´Ì¬£¨Í¼ÔËĞĞºó»á¸Ä±äµÄ£¬Ö÷ÒªÊÇÊı¾İ¼°¼¤»îÎ»£©
+	//é‡ç½®ï¼Œä¸»è¦æ˜¯æ¸…é™¤è¿è¡Œæ—¶çŠ¶æ€ï¼ˆå›¾è¿è¡Œåä¼šæ”¹å˜çš„ï¼Œä¸»è¦æ˜¯æ•°æ®åŠæ¿€æ´»ä½ï¼‰
 	virtual void Reset()
 	{
 		data.clear();
 		isActivated = false;
 		emit sig_Reseted(this);
 	}
-	//Çå³ı£¬Çå³ıÔËĞĞÊ±×´Ì¬ºÍ¶¯Ì¬×´Ì¬£¨Ö¸µ÷½ÚÍ¼Ê±ºò¿É±äµÄ£¬Ö÷ÒªÊÇÊ¹ÄÜÎ»isEnabledºÍÁ¬½Ó½ÚµãconnectedVertexes£©
-	//TODO:ÊÇ·ñ¼ÓÈëisUnchange²ÎÊı£¬Éè¶¨ÆäËü²ÎÊıÊÇ·ñ¿É±ä£¿
+	//æ¸…é™¤ï¼Œæ¸…é™¤è¿è¡Œæ—¶çŠ¶æ€å’ŒåŠ¨æ€çŠ¶æ€ï¼ˆæŒ‡è°ƒèŠ‚å›¾æ—¶å€™å¯å˜çš„ï¼Œä¸»è¦æ˜¯ä½¿èƒ½ä½isEnabledå’Œè¿æ¥èŠ‚ç‚¹connectedVertexesï¼‰
+	//TODO:æ˜¯å¦åŠ å…¥isUnchangeå‚æ•°ï¼Œè®¾å®šå…¶å®ƒå‚æ•°æ˜¯å¦å¯å˜ï¼Ÿ
 	virtual void Clear()
 	{
 		Reset();
 		isEnabled = true;
-		while (connectedVertexes.size() > 0)//Çå³ıconnectedVertexes
+		while (connectedVertexes.size() > 0)//æ¸…é™¤connectedVertexes
 		{
-			if(connectedVertexes.back().isNull()==false)//Èç¹û²»ÊÇÎŞĞ§½Úµã
-				Disconnect(connectedVertexes.back());//Disconnect()»áÇå³ı±¾½Úµã
+			if (connectedVertexes.back().isNull() == false)//å¦‚æœä¸æ˜¯æ— æ•ˆèŠ‚ç‚¹
+				Disconnect(connectedVertexes.back());//Disconnect()ä¼šæ¸…é™¤æœ¬èŠ‚ç‚¹
 			else
 				connectedVertexes.pop_back();
 		}
 		emit sig_Cleared(this);
 	}
-	//ÊÍ·Å£¬ÊÍ·ÅËùÓĞ³ÉÔ±Îª¿Õ£¬³ÉÎª³õÊ¼×´Ì¬
+	//é‡Šæ”¾ï¼Œé‡Šæ”¾æ‰€æœ‰æˆå‘˜ä¸ºç©ºï¼Œæˆä¸ºåˆå§‹çŠ¶æ€
 	virtual void Release()
 	{
-		Clear();
- 		defaultData.clear();
- 		additionInfo.clear();
- 		assertFunctions.clear();
-
-		disconnect();
-		connectedVertexes.clear();
-		if (gui != nullptr)
-			delete gui;
-		
-		emit sig_Released(this);
+// 		Clear();
+// 		defaultData.clear();
+// 		additionInfo.clear();
+// 		assertFunctions.clear();
+// 
+// 		disconnect();
+// 		connectedVertexes.clear();
+// 		if (gui != nullptr)
+// 			delete gui;
+// 
+// 		emit sig_Released(this);
 	}
 
-	virtual QStringList Write()const {throw "Not Implement"; }//TODO:³Ö¾Ã»¯£¬±£´æ½ÚµãĞÅÏ¢ºÍ½á¹¹£¨*ÊÇ·ñ±£´æÊı¾İ£¿£©
-	virtual void Read(QStringList){ throw "Not Implement";}//TODO:´Ó³Ö¾Ã»¯ĞÅÏ¢ÖĞ»Ö¸´
-	virtual QString GetGuiAdvice()const { return "normal"; }//TODO:¶Ô¹¤³§Àà¸ø³öµÄGUI½¨Òé£¬¿ÉÄÜ²ÉÓÃÀàËÆÃüÁîĞĞµÄ·½Ê½
+	virtual QStringList Write()const { throw "Not Implement"; }//TODO:æŒä¹…åŒ–ï¼Œä¿å­˜èŠ‚ç‚¹ä¿¡æ¯å’Œç»“æ„ï¼ˆ*æ˜¯å¦ä¿å­˜æ•°æ®ï¼Ÿï¼‰
+	virtual void Read(QStringList) { throw "Not Implement"; }//TODO:ä»æŒä¹…åŒ–ä¿¡æ¯ä¸­æ¢å¤
+	virtual QString GetGuiAdvice()const { return "normal"; }//TODO:å¯¹å·¥å‚ç±»ç»™å‡ºçš„GUIå»ºè®®ï¼Œå¯èƒ½é‡‡ç”¨ç±»ä¼¼å‘½ä»¤è¡Œçš„æ–¹å¼
 
-	QVariant data;//Êı¾İ
-	QVariant defaultData;//Ä¬ÈÏÖµ
-	QHash<QString, QVariant> additionInfo;//¸½¼ÓĞÅÏ¢
+	QVariant data;//æ•°æ®
+	QVariant defaultData;//é»˜è®¤å€¼
+	QHash<QString, QVariant> additionInfo;//é™„åŠ ä¿¡æ¯
 
-	QString description;//ÃèÊö
-	QList<std::function<bool(const QVariant&)>> assertFunctions;//ÊäÈëĞ£Ñé
+	QString description;//æè¿°
+	QList<std::function<bool(const QVariant&)>> assertFunctions;//è¾“å…¥æ ¡éªŒ
 
-	AlgGraphNode& node;//´ÓÊôµÄ½Úµã
-	QList<QPointer<AlgGraphVertex>> connectedVertexes;//Á¬½Óµ½µÄ¶Ë¿Ú
+	AlgGraphNode& node;//ä»å±çš„èŠ‚ç‚¹
+	QList<QPointer<AlgGraphVertex>> connectedVertexes;//è¿æ¥åˆ°çš„ç«¯å£
 
-	std::atomic_bool isActivated = false;//¼¤»î±êÖ¾
-	std::atomic_bool isEnabled = true;//Ê¹ÄÜ±êÖ¾
+	std::atomic_bool isActivated = false;//æ¿€æ´»æ ‡å¿—
+	std::atomic_bool isEnabled = true;//ä½¿èƒ½æ ‡å¿—
 
-	GuiGraphItemVertex*gui=nullptr;//Á¬½ÓµÄÍ¼ĞÎ
+	GuiGraphItemVertex*gui = nullptr;//è¿æ¥çš„å›¾å½¢//TODO:æ”¹æˆNodeå½“ä¸­ä½¿ç”¨Attachå’ŒDetachå‡½æ•°å¹¶åšæ£€éªŒçš„å½¢å¼
 signals:
-	void sig_ActivateBegin();//¼¤»î¿ªÊ¼
-	void sig_Activated(QVariant var, bool is_Activated);//¼¤»îĞÅºÅ£¬¿ÉÓÃÀ´¼¤»îÏÂÒ»¸ö½Úµã
-	void sig_ActivateEnd();//¼¤»î½áÊø¡¾²»Ò»¶¨¼¤»î³É¹¦¡¿
+	void sig_ActivateBegin();//æ¿€æ´»å¼€å§‹
+	void sig_Activated(QVariant var, bool is_Activated);//æ¿€æ´»ä¿¡å·ï¼Œå¯ç”¨æ¥æ¿€æ´»ä¸‹ä¸€ä¸ªèŠ‚ç‚¹
+	void sig_ActivateEnd();//æ¿€æ´»ç»“æŸã€ä¸ä¸€å®šæ¿€æ´»æˆåŠŸã€‘
 
-	void sig_ConnectionAdded(AlgGraphVertex*src, AlgGraphVertex*dst);//Á¬½Ó½¨Á¢³É¹¦
-	void sig_ConnectionRemoved(AlgGraphVertex*src, AlgGraphVertex*dst);//Á¬½ÓÒÆ³ı³É¹¦
-	void sig_Reseted(AlgGraphVertex*);//ÖØÖÃ³É¹¦
-	void sig_Cleared(AlgGraphVertex*);//Çå¿Õ³É¹¦
-	void sig_Released(AlgGraphVertex*);//ÊÍ·Å³É¹¦
+	void sig_ConnectionAdded(AlgGraphVertex*src, AlgGraphVertex*dst);//è¿æ¥å»ºç«‹æˆåŠŸ
+	void sig_ConnectionRemoved(AlgGraphVertex*src, AlgGraphVertex*dst);//è¿æ¥ç§»é™¤æˆåŠŸ
+	void sig_Reseted(AlgGraphVertex*);//é‡ç½®æˆåŠŸ
+	void sig_Cleared(AlgGraphVertex*);//æ¸…ç©ºæˆåŠŸ
+	void sig_Released(AlgGraphVertex*);//é‡Šæ”¾æˆåŠŸ
+
+	void sig_Destroyed(AlgGraphNode*node, AlgGraphVertex*vertex);//åˆ é™¤æˆåŠŸ
 protected:
-	//×Ô¶¨Òå¼¤»î²¿·Ö£¬
-	//Í¨¹ıºó£¬isActÎªtrue¡¾´æ´¢Êı¾İ¡¿£¬¼¤»îµ±Ç°Vertex£¬¸ÃVertex»á¡¾·¢ËÍsig_Activated()¡¿½øÒ»²½¼¤»î£»
-	//falseÔò¡¾Çå¿ÕÊı¾İ¡¿£¬ÇÒ¡¾²»»á·¢ËÍ¡¿sig_Activated()½øÒ»²½¼¤»î
+	//è‡ªå®šä¹‰æ¿€æ´»éƒ¨åˆ†ï¼Œ
+	//é€šè¿‡åï¼ŒisActä¸ºtrueã€å­˜å‚¨æ•°æ®ã€‘ï¼Œæ¿€æ´»å½“å‰Vertexï¼Œè¯¥Vertexä¼šã€å‘é€sig_Activated()ã€‘è¿›ä¸€æ­¥æ¿€æ´»ï¼›
+	//falseåˆ™ã€æ¸…ç©ºæ•°æ®ã€‘ï¼Œä¸”ã€ä¸ä¼šå‘é€ã€‘sig_Activated()è¿›ä¸€æ­¥æ¿€æ´»
 	virtual void _Activate(QVariant var, bool isAct)
 	{
 		if (isAct == true)
@@ -315,22 +169,23 @@ public:
 	AlgGraphVertex_Input(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
 	virtual ~AlgGraphVertex_Input() {  }
 
+	//virtual void Init();
 	enum class Behavior :unsigned char
 	{
-		KEEP = 0,//Ò»Ö±±£³Ö¼¤»î×´Ì¬ºÍÊı¾İ£¨Ä¬ÈÏ£©
-		DISPOSABLE = 1,//Ò»´ÎĞÔ£¬¼¤»îÒ»´ÎºóĞÅºÅºÍÊı¾İÏûÊ§//TODO:¿ÉÒÔÓÃNodeµÄ¼¤»îĞÅºÅÁ¬½ÓActivate(0,false)À´ÊµÏÖ
-		//BUFFER = 2,//»º³å£¬»º³åÊäÈëÊı¾İ//TODO:Õâ¸öÏÖÔÚµÄÏë·¨ÊÇÊ¹ÓÃBuffer NodeÊµÏÖ
-	}behavior=Behavior::KEEP;
+		KEEP = 0,//ä¸€ç›´ä¿æŒæ¿€æ´»çŠ¶æ€å’Œæ•°æ®ï¼ˆé»˜è®¤ï¼‰
+		DISPOSABLE = 1,//ä¸€æ¬¡æ€§ï¼Œæ¿€æ´»ä¸€æ¬¡åä¿¡å·å’Œæ•°æ®æ¶ˆå¤±//TODO:å¯ä»¥ç”¨Nodeçš„æ¿€æ´»ä¿¡å·è¿æ¥Activate(0,false)æ¥å®ç°
+					   //BUFFER = 2,//ç¼“å†²ï¼Œç¼“å†²è¾“å…¥æ•°æ®//TODO:è¿™ä¸ªç°åœ¨çš„æƒ³æ³•æ˜¯ä½¿ç”¨Buffer Nodeå®ç°
+	}behavior = Behavior::KEEP;
 };
 class AlgGraphVertex_Output
 	:public AlgGraphVertex
 {
 	Q_OBJECT
 public:
-	AlgGraphVertex_Output(AlgGraphNode&parent, QString name):AlgGraphVertex(parent,name){}
+	AlgGraphVertex_Output(AlgGraphNode&parent, QString name) :AlgGraphVertex(parent, name) {}
 	virtual ~AlgGraphVertex_Output() { Release(); }
 
-	virtual void _Activate(QVariant var, bool isNow)//isNow£¬ÊÇ·ñÁ¢¿Ì·¢ËÍ¡¾·ñÔòÖ»´æÊı¾İ²»·¢ËÍ¡¿¡£Óë»ùÀàÖĞÏà±È£¬¼¤»îºó±Ø¶¨×Ô¶¯Çå¿Õ
+	virtual void _Activate(QVariant var, bool isNow)//isNowï¼Œæ˜¯å¦ç«‹åˆ»å‘é€ã€å¦åˆ™åªå­˜æ•°æ®ä¸å‘é€ã€‘ã€‚ä¸åŸºç±»ä¸­ç›¸æ¯”ï¼Œæ¿€æ´»åå¿…å®šè‡ªåŠ¨æ¸…ç©º
 	{
 		if (isNow == false)
 			data = var;
@@ -344,14 +199,160 @@ public:
 };
 #pragma endregion
 
+#pragma region AlgGraphNode
+//ç®—æ³•èŠ‚ç‚¹
+//TODO:æ´¾ç”Ÿï¼šåŸºæœ¬ç®—æ³•ã€å¸¸é‡ã€å¤–éƒ¨è¾“å…¥ã€å¤–éƒ¨è¾“å‡ºã€å‡½æ•°ã€æ¡ä»¶ã€whileã€é€»è¾‘è¿ç®—ã€å»¶æ—¶ã€å¾ªç¯ã€ç¼“å†²
+class AlgGraphNode
+	:public QObject
+{
+	Q_OBJECT
+public:
+	enum class RunMode
+	{
+		Thread,//å¤šçº¿ç¨‹æ–¹å¼ã€é»˜è®¤ã€‘
+		Direct,//ç®€å•ç›´æ¥æ–¹å¼ï¼Œä¸å¼€å¤šçº¿ç¨‹
+		Function,//å‡½æ•°æ–¹å¼ï¼ˆNodeå†…éƒ¨åµŒå¥—å¦ä¸€ä¸ªGraphï¼‰
+	};
+
+	AlgGraphNode(QObject*parent, QThreadPool&pool);
+	virtual ~AlgGraphNode();
+
+	virtual void Init();//åˆå§‹åŒ–ä¸€äº›å‚æ•°ï¼Œå¦‚æœåˆå§‹åŒ–åå°†_isUnchangeè®¾ä¸ºtrueï¼Œåˆ™ä¸èƒ½æ›´æ”¹è®¾å®š
+	virtual void Reset();//é‡ç½®è¿è¡ŒçŠ¶æ€ï¼Œæ¸…é™¤æ‰€æœ‰è¿è¡Œæ—¶å‚æ•°ï¼ˆè¿è¡Œåå¯å˜çš„å‚æ•°ï¼‰
+	virtual void Clear() {}
+	virtual void Release();
+	virtual QString GetGuiAdvice()const { return "normal"; }
+
+	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//æ·»åŠ é»˜è®¤èŠ‚ç‚¹ï¼Œå¹¶è¿æ¥è¾“å…¥èŠ‚ç‚¹çš„sig_Activated()ä¿¡å·
+	virtual QHash<QString, AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
+	virtual void RemoveVertex(QString name,bool isInput);
+	virtual void RemoveVertex(QStringList names, bool isInput);
+	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
+	virtual void DisconnectVertex(QString vertexName);
+	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
+
+	virtual void Write();
+	virtual void Read();
+
+	void Activate();
+	void Run();
+	void Output();
+	void Pause(bool isPause);
+	void Stop(bool isStop);
+
+	void AttachGui(GuiGraphController*gui) { assert(_gui == nullptr); _gui = gui; }
+	void DetachGui() { assert(_gui != nullptr); _gui = nullptr; }//TODO:æ£€æŸ¥GuiGraphNodeææ„åçš„å®‰å…¨æ€§
+	bool isHasGui()const { return _gui != nullptr; }
+	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
+signals:
+	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
+	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
+	void sig_ConnectionAdded();
+	void sig_ConnectionRemoved();
+
+	void sig_ActivatedFinished(AlgGraphNode*node);//èŠ‚ç‚¹è¢«æ¿€æ´»
+	void sig_RunFinished(AlgGraphNode*node);//è¿è¡Œç»“æŸ
+	void sig_OutputFinished(AlgGraphNode*node);//è¾“å‡ºç»“æŸ
+
+	void sig_Destroyed(AlgGraphNode*node);
+protected:
+	//ç”¨äºè¿­ä»£å¤„ç†_inputVertexå’Œ_outputVertexçš„æ¨¡æ¿å‡½æ•°ï¼Œfuncæ˜¯lambdaè¡¨è¾¾å¼ã€‚å‡½æ•°å°†ä¾æ¬¡è¿­ä»£vtxsä¸­å…ƒç´ ï¼Œå¦‚æœä¸å­˜åœ¨ä¼šè¾“å‡ºé”™è¯¯å¹¶åˆ é™¤
+	//ç¤ºä¾‹ï¼š_ProcessVertex(_inputVertex,[this](AlgGraphVertex*vertex){vertex->Reset();})
+	template<typename F>
+	bool _ProcessVertex(QHash<QString, QPointer<AlgGraphVertex>>&vtxs, F const&func)
+	{
+		for (auto it = vtxs.begin(); it != vtxs.end();)
+		{
+			if (it->isNull() == false)
+			{
+				func(*it);
+				++it;
+			}
+			else
+			{
+				qDebug() << __FUNCTION__ << it.key() << "Not exist";
+				it = vtxs.erase(it);
+			}
+		}
+	}
+	virtual QVariantHash _LoadInput();/*è‡ªå®šä¹‰è¯»å–è¾“å…¥ï¼Œé»˜è®¤ç›´æ¥å°†æ•°æ®ä»Vertexå½“ä¸­å¤åˆ¶ä¸€ä»½ï¼Œä»¥å…è¿è¡Œè¿‡ç¨‹ä¸­è¾“å…¥è¢«ä¿®æ”¹*/
+	virtual QVariantHash _Run(QVariantHash data);//ä¸»è¦çš„è¿è¡Œéƒ¨åˆ†ï¼Œã€å°†åœ¨å¦ä¸€ä¸ªçº¿ç¨‹ä¸­è¿è¡Œã€‘
+	virtual void _LoadOutput(QVariantHash result);/*è‡ªå®šä¹‰åŠ è½½è¾“å‡ºï¼Œé»˜è®¤ç›´æ¥å°†æ•°æ®ä»ä¸´æ—¶æ•°æ®ä¸­åŠ è½½åˆ°è¾“å‡ºä¸­*/
+
+	QHash<QString, AlgGraphVertex*>_inputVertex;//è¾“å…¥èŠ‚ç‚¹
+	QHash<QString, AlgGraphVertex*>_outputVertex;//è¾“å‡ºèŠ‚ç‚¹
+
+	QFutureWatcher<QVariantHash> _result;//ç¨‹åºè¿è¡Œè§‚æµ‹å™¨
+	QThreadPool&_pool;//ä½¿ç”¨çš„çº¿ç¨‹æ± 
+	QReadWriteLock _lock;//é”ã€å¯èƒ½å¹¶ä¸éœ€è¦ï¼Œå› ä¸ºè¯»å†™å‚æ•°éƒ½å‘ç”Ÿåœ¨ä¸»çº¿ç¨‹ã€‘
+
+	RunMode _mode = RunMode::Thread;//è¿è¡Œæ–¹å¼
+
+	std::atomic_bool _isEnable = true;//ä½¿èƒ½
+	std::atomic_bool _isUnchange = false;//ä¸å¯åœ¨åˆ›å»ºåä¿®æ”¹
+	std::atomic_bool _pause = false;//æš‚åœæ ‡å¿—
+	std::atomic_bool _stop = false;//ç»“æŸæ ‡å¿—
+
+	QPointer<GuiGraphController> _gui = nullptr;
+};
+
+class AlgGraphNode_Input
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Input(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
+	virtual ~AlgGraphNode_Input() {}
+
+	virtual void Init() override;
+protected:
+	virtual QVariantHash _Run(QVariantHash data) override;
+
+};
+class AlgGraphNode_Output
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Output(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
+	virtual ~AlgGraphNode_Output() {}
+
+	virtual void Init() override;
+protected:
+	virtual QVariantHash _Run(QVariantHash data) override;
+
+};
+class AlgGraphNode_Add
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
+	QHash<AlgGraphVertex*, int>idxTbl;//å¯¹åº”é¡ºåº
+	virtual void Init() override;
+protected:
+	virtual QVariantHash _Run(QVariantHash data) override;
+
+};
+class AlgGraphNode_Function
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+
+};
+
+#pragma endregion
+
+
 
 
 
 enum
 {
-	VERTEX_TYPE=65536+0x100,
-	ARROW_TYPE=65536+0x200,
-	NODE_TYPE=65536+0x400,
+	VERTEX_TYPE = 65536 + 0x100,
+	ARROW_TYPE = 65536 + 0x200,
+	NODE_TYPE = 65536 + 0x400,
 };
 class GuiGraphItemArrow
 	:public QGraphicsLineItem
@@ -359,6 +360,7 @@ class GuiGraphItemArrow
 public:
 	//GuiGraphItemArrow(const QLineF &line, QGraphicsItem*parent) :QGraphicsLineItem(line, parent) {}
 	GuiGraphItemArrow(const GuiGraphItemVertex*src, const GuiGraphItemVertex*dst);
+	virtual ~GuiGraphItemArrow();
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
 
@@ -366,7 +368,7 @@ public:
 	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
 
-	QPointer<const AlgGraphVertex>srcVertex, dstVertex;//Ê¼Ä©Vertex
+	const GuiGraphItemVertex*srcItemVertex, *dstItemVertex;//å§‹æœ«Vertex
 protected:
 
 };
@@ -374,39 +376,47 @@ class GuiGraphItemVertex
 	:public QGraphicsItem
 {
 public:
-	GuiGraphItemVertex(QGraphicsItem*parent, const AlgGraphVertex&vertex)
-		:QGraphicsItem(parent), _vertex(&vertex) {
-		setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
-	}
-	virtual ~GuiGraphItemVertex() { qDebug()<<_vertex->objectName() << __FUNCTION__; }
-	enum{Type=VERTEX_TYPE};
+	GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVertex&vertex,bool isInput);
+	virtual ~GuiGraphItemVertex();
+	enum { Type = VERTEX_TYPE };
 	virtual int type()const { return Type; }
 
-	void AddArrow(GuiGraphItemArrow*arrow) { assert(arrow != nullptr);  _arrows.append(QSharedPointer<GuiGraphItemArrow>(arrow)); }
-	void RemoveArrow(GuiGraphItemArrow*arrow) { _arrows.removeOne(QSharedPointer<GuiGraphItemArrow>(arrow)); }
-// 	void RemoveArrow(AlgGraphVertex*another) 
-// 	{ 
-// 		int i = 0;
-// 		while(i<_arrows.size())
-// 			if(_arrows[i]->srcVertex==another||_arrows[i])
-// 	}
+	virtual QPointF ArrowAttachPosition()const//ç®­å¤´è¿æ¥ç‚¹ä½ç½® 
+	{
+		return boundingRect().center();
+	}
 
-	virtual QPointF ArrowAttachPosition()const//¼ıÍ·Á¬½ÓµãÎ»ÖÃ 
-	{ return boundingRect().center(); }
+	virtual QRectF boundingRect() const override
+	{
+		QFontMetrics fm(scene() != nullptr ? (scene()->font()) : (QApplication::font()));
+		return QRectF(0, 0, fm.width(_vertex.objectName()), fm.height());
+	}
+	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override
+	{
+		painter->drawText(0, boundingRect().height(), _vertex.objectName()/*,QTextOption(Qt::AlignmentFlag::AlignCenter)*/);
+		if (isSelected() == true)
+			painter->setBrush(Qt::Dense5Pattern);
+		if (_mouseState == 1)
+			painter->drawRect(boundingRect());
+		else
+		{
+			painter->setPen(QPen(QColor(200, 200, 200)));
+			//painter->setBrush(QBrush(QColor(100, 100, 100), Qt::BrushStyle::SolidPattern));
+			painter->drawRect(boundingRect());
+		}
+	}
 
-	virtual QRectF boundingRect() const override;
-	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+	const bool _isInput;
+	char _mouseState = 0;
 
-	QPointer<const AlgGraphVertex>_vertex;
-protected:
-
-	int _mouseState = 0;
-	QList<QSharedPointer<GuiGraphItemArrow>>_arrows;
+	const AlgGraphVertex&_vertex;
+	const GuiGraphItemNode&_nodeItem;
+	QList<GuiGraphItemArrow*>_arrows;
 
 	virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value)
 	{
 		if (change == QGraphicsItem::ItemScenePositionHasChanged) {
-			for (auto a : _arrows)	
+			for (auto a : _arrows)
 				a->updatePosition();
 		}
 		return value;
@@ -420,95 +430,78 @@ class GuiGraphItemNode
 	:public QGraphicsRectItem
 {
 public:
-	GuiGraphItemNode(QRectF area, QGraphicsItem*parent,GuiGraphNode&holder) :QGraphicsRectItem(area, parent),_holder(holder)
+	GuiGraphItemNode(QRectF area, QGraphicsItem*parent, GuiGraphController&holder)
+		:QGraphicsRectItem(area, parent), controller(holder), title(this)
 	{
 		setTransformOriginPoint(boundingRect().center());
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
 		//setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
 	}
-
+	virtual ~GuiGraphItemNode();//ææ„æ—¶å€™è‡ªåŠ¨è§£ç¦»
 	enum { Type = NODE_TYPE };
 	virtual int type()const { return Type; }
-	const GuiGraphNode&_holder;
-protected:
+
+	virtual void Refresh();
+
+	GuiGraphController&controller;
+	QGraphicsTextItem title;
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>inputItemVertex;
+	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>outputItemVertex;
 };
-class GuiGraphNode
+//Nodeåœ¨Guiçš„æ§åˆ¶å™¨ï¼Œæ›´å¤šçš„èµ·åˆ°ä¸€ä¸ªåœ¨AlgGraphNodeå’ŒGuiGraphItemNodeä¹‹é—´ä¸­è½¬çš„ä½œç”¨
+class GuiGraphController
 	:public QObject
 {
 	Q_OBJECT
 public:
-	GuiGraphNode(const AlgGraphNode&node);
-	virtual ~GuiGraphNode() 
-	{
-		qDebug() << _node.objectName() << __FUNCTION__;
-		if (_nodeItem != nullptr) 
-		{
-			//if(_nodeItem->scene()!=nullptr)
-			//	_nodeItem->scene()->removeItem(_nodeItem);
-			delete _nodeItem;
+	GuiGraphController(const AlgGraphNode&node, GraphScene&scene);
+	virtual ~GuiGraphController();
 
-		}
-		if (_panel.isNull() == false)
-			delete _panel;
-	}
-	QGraphicsItem* InitApperance();
+	virtual GuiGraphItemNode* InitApperance(QPointF center = QPointF(0, 0), QRectF size = QRectF(0, 0, 100, 100));//æ ¹æ®AlgGraphNodeçš„ä¿¡æ¯åˆå§‹åŒ–GuiGraphItemNode
+	virtual QWidget* InitWidget(QWidget*parent);
 
-	virtual QWidget* InitWidget(QWidget*parent)
-	{
-		_panel = new QPlainTextEdit(parent);
-		//connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
-// 		connect(this, &GuiGraphNode::destroyed, this, [this] 
-// 		{
-// 			_nodeItem->scene()->removeItem(_nodeItem); 
-// 			delete _nodeItem;
-// 		});
-		return _panel;
-	}
-
-	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx);
+	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx, const bool isInput);
 	GuiGraphItemArrow*AddConnection();
-	QGraphicsScene*AttachScene(QGraphicsScene*scene) { scene->addItem(_nodeItem); return scene; }
+	void DetachItem() { assert(_nodeItem != nullptr); _nodeItem = nullptr; }
 
 	virtual QVariant GetData() { throw "NotImplement"; }
 	virtual void SetData(QVariant var) { throw "NotImplement"; }
 
-	const AlgGraphNode& _node;//¶ÔÏàÓ¦AlgGraphNodeµÄ³£ÒıÓÃ£¬Ö»¶Á²»¿ÉĞ´
+	const AlgGraphNode& _node;//å¯¹ç›¸åº”AlgGraphNodeçš„å¸¸å¼•ç”¨ï¼Œåªè¯»ä¸å¯å†™
 signals:
-	void sig_ValueChanged();//TODO:ºóÃæÒªÏÂ·Åµ½ÏàÓ¦ÊäÈëÊä³ö×ÓÀàµ±ÖĞ
-protected:	
-	QHash<QString, const AlgGraphVertex*>_inputVertex;//ÊäÈë½Úµã
-	QHash<QString, const AlgGraphVertex*>_outputVertex;//ÊäÈë½Úµã
-	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _inputVertexItem;//ÊäÈë½Úµã
-	QHash<const AlgGraphVertex*, GuiGraphItemVertex*> _outputVertexItem;//Êä³ö½Úµã
+	void sig_Destroyed(GuiGraphController*node);//ææ„å‰å‘å‡ºçš„ä¿¡å·
+	void sig_ValueChanged();//TODO:åé¢è¦ä¸‹æ”¾åˆ°ç›¸åº”è¾“å…¥è¾“å‡ºå­ç±»å½“ä¸­
+protected:
 
-	GuiGraphItemNode* _nodeItem=nullptr;//ÔÚ³¡¾°ÖĞ»æÖÆºÍ½»»¥µÄÎïÌå
-	QPointer<QWidget> _panel=nullptr;//Ãæ°å¿Ø¼ş£¬TODO:ºóÃæÒªÏÂ·Åµ½ÏàÓ¦ÊäÈëÊä³ö×ÓÀàµ±ÖĞ
+	GraphScene&_scene;
+	GuiGraphItemNode* _nodeItem = nullptr;//åœ¨åœºæ™¯ä¸­ç»˜åˆ¶å’Œäº¤äº’çš„ç‰©ä½“ï¼Œå…¶ææ„æ—¶ä¼šè‡ªåŠ¨è§£ç¦»
+	QPointer<QWidget> _panel = nullptr;//é¢æ¿æ§ä»¶ï¼ŒTODO:åé¢è¦ä¸‹æ”¾åˆ°ç›¸åº”è¾“å…¥è¾“å‡ºå­ç±»å½“ä¸­
 };
 
-class GuiGraphNode_Input
-	:public GuiGraphNode
+class GuiGraphController_Input
+	:public GuiGraphController
 {
 	Q_OBJECT
 public:
-	GuiGraphNode_Input(const AlgGraphNode&node):GuiGraphNode(node){}
-	virtual ~GuiGraphNode_Input() {}
+	GuiGraphController_Input(const AlgGraphNode&node, GraphScene&scene) :GuiGraphController(node, scene) {}
+	virtual ~GuiGraphController_Input() {}
 	virtual QWidget* InitWidget(QWidget*parent)
 	{
 		_panel = new QPlainTextEdit(parent);
-		connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphNode::sig_ValueChanged);
+		connect(qobject_cast<QPlainTextEdit*>(_panel), &QPlainTextEdit::textChanged, this, &GuiGraphController::sig_ValueChanged);
 		return _panel;
 	}
 	virtual QVariant GetData() { return (qobject_cast<QPlainTextEdit*>(_panel))->toPlainText(); }
 	//virtual void SetData(QVariant var) { throw "NotImplement"; }
 };
-class GuiGraphNode_Output
-	:public GuiGraphNode
+class GuiGraphController_Output
+	:public GuiGraphController
 {
 	Q_OBJECT
 public:
-	GuiGraphNode_Output(const AlgGraphNode&node) :GuiGraphNode(node) {}
-	virtual ~GuiGraphNode_Output() {}
+	GuiGraphController_Output(const AlgGraphNode&node, GraphScene&scene) :GuiGraphController(node, scene) {}
+	virtual ~GuiGraphController_Output() {}
 	virtual QWidget* InitWidget(QWidget*parent)
 	{
 		_panel = new QLabel(parent);
@@ -522,17 +515,17 @@ class GraphScene
 {
 	Q_OBJECT
 public:
-	GraphScene(QObject*parent):QGraphicsScene(parent){}
+	GraphScene(QObject*parent) :QGraphicsScene(parent) {}
 	virtual ~GraphScene() { if (arrow != nullptr)delete arrow; }
 signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
 protected:
-	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//Ö÷Òª´¦Àí»­Ïß
+	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//ä¸»è¦å¤„ç†ç”»çº¿
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void keyPressEvent(QKeyEvent *event) override;
 
-	QGraphicsLineItem*arrow = nullptr;
+	GuiGraphItemArrow*arrow = nullptr;
 };
 
 class GraphView
@@ -553,21 +546,20 @@ class TestAnything : public QMainWindow
 	Q_OBJECT
 public:
 	TestAnything(QWidget *parent = Q_NULLPTR);
-	~TestAnything()
-	{
-		for (auto n : _nodes)
-			delete n;
-		_nodes.clear();
-	}
+	~TestAnything();
 
-	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphNode*guiNode = nullptr, QPointF center = QPointF(0, 0));//Ìí¼ÓÒÑ´´½¨µÄnode²¢ÅäÖÃÏàÓ¦µÄguiNode£¬Èç¹ûguiNodeÎªnullptr£¬ÔòÌí¼ÓÒ»¸öÄ¬ÈÏµÄ
-	void AddNodeAsAdvice(QString advice);//TODO:¸ù¾İÃüÁîĞĞÌí¼Ó
-	GuiGraphNode* AddGuiNode(AlgGraphNode&node,GuiGraphNode*guiNode=nullptr, QPointF center = QPointF(0, 0));//¸ønodeÌí¼ÓÏÔÊ¾²¿·Ö£¬Èç¹ûguiNodeÎªnullptrÔòÌí¼ÓÄ¬ÈÏµÄ
-	
-	void RemoveNode(AlgGraphNode*node);
+	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphController*guiNode = nullptr, QPointF center = QPointF(0, 0));//æ·»åŠ å·²åˆ›å»ºçš„nodeå¹¶é…ç½®ç›¸åº”çš„guiNodeï¼Œå¦‚æœguiNodeä¸ºnullptrï¼Œåˆ™æ·»åŠ ä¸€ä¸ªé»˜è®¤çš„
+	GuiGraphController* AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center = QPointF(0, 0));//ç»™nodeæ·»åŠ æ˜¾ç¤ºéƒ¨åˆ†ï¼Œå¦‚æœguiNodeä¸ºnullptråˆ™æ·»åŠ é»˜è®¤çš„
+	bool AddConnection(AlgGraphNode&srcNode, QString srcNodeName, bool srcIsInput, AlgGraphNode&dstNode, QString dstNodeName, bool dstIsInput);
+	bool AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);//æ·»åŠ è¿æ¥å¹¶æ˜¾ç¤º
+	bool AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);//åœ¨GUIä¸Šæ·»åŠ è¿æ¥ï¼ˆå®é™…è°ƒç”¨AddConnection(AlgGraphVertex*, AlgGraphVertex*)ï¼‰
+
+	void AddNodeAsAdvice(QString advice);//TODO:æ ¹æ®å‘½ä»¤è¡Œæ·»åŠ 
+
+	bool RemoveNode(AlgGraphNode*node);
+	bool RemoveVertex(AlgGraphVertex*vertex);
 	void RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst);
-	void AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);
-	void AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);
+
 
 	void slot_Start(bool b);
 
@@ -577,7 +569,6 @@ private:
 	Ui::TestAnythingClass ui;
 	GraphScene _scene;
 	QList<AlgGraphNode*>_nodes;
-	QList<QPointer<GuiGraphItemArrow>>_arrows;
 
 	QGraphicsItem*selectedItem = nullptr;
 

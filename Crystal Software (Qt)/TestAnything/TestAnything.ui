@@ -20,7 +20,7 @@
       <property name="title">
        <string>输入</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="verticalLayout_Input">
        <property name="spacing">
         <number>0</number>
        </property>
@@ -47,7 +47,7 @@
       <property name="title">
        <string>输出</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout_2"/>
+      <layout class="QVBoxLayout" name="verticalLayout_Output"/>
      </widget>
     </item>
     <item row="1" column="0" colspan="2">
