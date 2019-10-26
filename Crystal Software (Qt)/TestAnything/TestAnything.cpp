@@ -8,6 +8,7 @@
 #include <vld.h>
 using namespace cv;
 
+#pragma region TestAnything
 TestAnything::TestAnything(QWidget *parent)
 	: QMainWindow(parent), _pool(this), _scene(this)
 {
@@ -33,6 +34,10 @@ TestAnything::TestAnything(QWidget *parent)
 		auto gui = new GuiGraphController(*node, _scene);
 		AddNode(*node, gui, QPointF(0, 0));
 	});
+	connect(ui.pushButton_5, &QPushButton::clicked, this, [this](bool b)
+	{
+		//_scene.clear();
+	});
 	connect(ui.pushButton_7, &QPushButton::clicked, this, [this](bool b)
 	{
 		if (_nodes.size() > 0)
@@ -43,14 +48,12 @@ TestAnything::TestAnything(QWidget *parent)
 				delete vtxs[vtxs.keys()[0]];
 		}
 	});
-	connect(ui.pushButton_5, &QPushButton::clicked, this, [this](bool b)
-	{
-		_scene.clear();
-	});
+
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
 	bool (TestAnything::*pAddConnection)(GuiGraphItemVertex*, GuiGraphItemVertex*) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
+	_monitorTimerId = startTimer(100, Qt::TimerType::CoarseTimer);
 }
 
 TestAnything::~TestAnything()
@@ -115,7 +118,21 @@ bool TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVer
 		<< dstVertex->node.objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
 	srcVertex->Connect(dstVertex);
 	connect(srcVertex, &AlgGraphVertex::sig_Activated, dstVertex, &AlgGraphVertex::Activate);
-	connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, &TestAnything::RemoveConnection, Qt::UniqueConnection);//【注意这里务必加入UniqueConnection避免重复发送】
+	connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, [this](AlgGraphVertex*src, AlgGraphVertex*dst)
+	{	
+		if (src->gui != nullptr&&dst->gui != nullptr)
+		{
+			for (auto a : src->gui->_arrows)
+			{
+				if (a->dstItemVertex == dst->gui)
+				{
+					delete a;
+					return;
+				}
+			}
+			throw "Can't Find";//TODO:改成相应Error
+		}
+	}, Qt::UniqueConnection);//【注意这里务必加入UniqueConnection避免重复发送】
 	auto srcItem = srcVertex->gui, dstItem = dstVertex->gui;
 	b = srcItem != nullptr&&dstItem != nullptr;
 	assert(b);	if (!b)	return true;//注意这里仍然返回true因为连接已成功，只是后面可以添加一个warning来提示
@@ -130,18 +147,7 @@ bool TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVer
 
 void TestAnything::RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst)
 {
-	if (src->gui != nullptr&&dst->gui != nullptr)
-	{
-		for (auto a : src->gui->_arrows)
-		{
-			if (a->dstItemVertex == dst->gui)
-			{
-				delete a;
-				return;
-			}
-		}
-		throw "Can't Find";//TODO:改成相应Error
-	}
+	src->Disconnect(dst);
 }
 
 void TestAnything::slot_Start(bool b)
@@ -166,25 +172,34 @@ void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 			delete const_cast<AlgGraphVertex*> (&((qgraphicsitem_cast<GuiGraphItemVertex*>(item))->_vertex));
 			break;
 		case GuiGraphItemArrow::Type:
-			//RemoveConnection()
+		{
+			auto arrow = qgraphicsitem_cast<GuiGraphItemArrow*>(item);
+			RemoveConnection(const_cast<AlgGraphVertex*>(&arrow->srcItemVertex->_vertex),
+				const_cast<AlgGraphVertex*>(&arrow->dstItemVertex->_vertex));
 			break;
+		}
 		default:
 			break;
 		}
 	}
 }
 
-AlgGraphVertex::~AlgGraphVertex()
+void TestAnything::timerEvent(QTimerEvent *event)
 {
-	qDebug() << objectName() << __FUNCTION__;
-	emit sig_Destroyed(&node, this);
-	Clear();
-	if (gui != nullptr)
+	if (event->timerId() == _monitorTimerId)//用来监视避免内存泄露的
 	{
-		delete gui;
-		gui = nullptr;
+		ui.lcdNumber_AlgNode->display(static_cast<int> (AlgGraphNode::GetAmount()));
+		ui.lcdNumber_AlgVertex->display(static_cast<int> (AlgGraphVertex::GetAmount()));
+		ui.lcdNumber_GuiController->display(static_cast<int> (GuiGraphController::GetAmount()));
+		ui.lcdNumber_GuiItemNode->display(static_cast<int> (GuiGraphItemNode::GetAmount()));
+		ui.lcdNumber_GuiItemVertex->display(static_cast<int> (GuiGraphItemVertex::GetAmount()));
+		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
 	}
 }
+#pragma endregion TestAnything
+
+#pragma region AlgGraphVertex
+size_t AlgGraphVertex::_amount = 0;
 
 void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
 {
@@ -200,6 +215,7 @@ void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
 		emit sig_ActivateEnd();
 	}
 }
+#pragma endregion AlgGraphVertex
 
 #pragma region AlgGraphNode
 AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool)
@@ -207,6 +223,7 @@ AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool)
 {
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, [this] {emit sig_RunFinished(this); });
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, &AlgGraphNode::Output);
+	_amount++;
 }
 AlgGraphNode::~AlgGraphNode()
 {
@@ -221,6 +238,7 @@ AlgGraphNode::~AlgGraphNode()
 	_outputVertex.clear();
 	if (_gui != nullptr)
 		delete _gui;
+	_amount--;
 }
 
 void AlgGraphNode::Reset()
@@ -416,6 +434,9 @@ void AlgGraphNode::_LoadOutput(QVariantHash result)
 		//else GraphWarning();//TODO:警告
 	}
 }
+
+size_t AlgGraphNode::_amount = 0;
+
 QVariantHash AlgGraphNode::_Run(QVariantHash data)
 {
 	QThread::msleep(500);
@@ -454,6 +475,7 @@ GuiGraphItemVertex::GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVe
 {
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
+	_amount++;
 }
 
 GuiGraphItemVertex::~GuiGraphItemVertex()
@@ -468,8 +490,11 @@ GuiGraphItemVertex::~GuiGraphItemVertex()
 	for (auto a : tmpArrow)
 		delete a;
 	_arrows.clear();
+	_amount--;
 }
 
+
+size_t GuiGraphItemVertex::_amount = 0;
 
 #pragma endregion GuiGraphItem
 
@@ -484,6 +509,7 @@ GuiGraphController::GuiGraphController(const AlgGraphNode&node, GraphScene&scene
 		if (_nodeItem != nullptr)
 			_nodeItem->Refresh();
 	});
+	_amount++;
 }
 
 GuiGraphController::~GuiGraphController()
@@ -498,6 +524,7 @@ GuiGraphController::~GuiGraphController()
 	if (_panel.isNull() == false)
 		delete _panel;
 	//const_cast<AlgGraphNode&>(_node).DetachGui();
+	_amount--;
 }
 QWidget* GuiGraphController::InitWidget(QWidget*parent)
 {
@@ -545,6 +572,8 @@ GuiGraphItemVertex* GuiGraphController::AddVertex(const AlgGraphVertex*vtx, cons
 	return vtxItem;
 }
 
+size_t GuiGraphController::_amount = 0;
+
 GuiGraphItemNode* GuiGraphController::InitApperance(QPointF center /*= QPointF(0, 0)*/, QRectF size /*= QRectF(0, 0, 100, 100)*/)
 {
 	if (_nodeItem != nullptr)
@@ -575,6 +604,7 @@ GuiGraphItemNode::~GuiGraphItemNode()
 	for (auto v : outputItemVertex.values())
 		delete v;
 	outputItemVertex.clear();
+	_amount--;
 }
 
 void GuiGraphItemNode::Refresh()
@@ -598,8 +628,11 @@ void GuiGraphItemNode::Refresh()
 	}
 }
 
+size_t GuiGraphItemNode::_amount=0;
+
 #pragma endregion GuiGraphItem
 
+#pragma region GraphScene
 void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
 	if (event->button() == Qt::LeftButton)
@@ -667,11 +700,15 @@ void GraphScene::keyPressEvent(QKeyEvent *event)
 		emit sig_RemoveItems(selects);
 	}
 }
+#pragma endregion GraphScene
 
+#pragma region GuiGraphItemArrow
 GuiGraphItemArrow::GuiGraphItemArrow(const GuiGraphItemVertex*src, const GuiGraphItemVertex*dst)
 	:QGraphicsLineItem(nullptr),srcItemVertex(src),dstItemVertex(dst)
 {
+	setFlag(QGraphicsItem::ItemIsSelectable);
 	updatePosition();
+	++_amount;
 }
 
 GuiGraphItemArrow::~GuiGraphItemArrow()
@@ -687,6 +724,7 @@ GuiGraphItemArrow::~GuiGraphItemArrow()
 		const_cast<GuiGraphItemVertex*>(dstItemVertex)->_arrows.removeOne(this);
 		dstItemVertex = nullptr;
 	}
+	--_amount;
 }
 
 void GuiGraphItemArrow::updatePosition()
@@ -696,4 +734,12 @@ void GuiGraphItemArrow::updatePosition()
 
 	setLine(QLineF(p1, p2));
 }
+size_t GuiGraphItemArrow::_amount = 0;
+void GuiGraphItemArrow::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
+{
+	QGraphicsLineItem::paint(painter, option, widget);
+}
+#pragma endregion GuiGraphItemArrow
+
+
 

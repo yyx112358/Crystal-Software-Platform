@@ -50,8 +50,21 @@ public:
 	AlgGraphVertex(AlgGraphNode&parent, QString name)
 		:QObject(reinterpret_cast<QObject*>(&parent)), node(parent) {
 		setObjectName(name);
+		_amount++;
 	}
-	virtual ~AlgGraphVertex();
+
+	virtual ~AlgGraphVertex()
+	{
+		qDebug() << objectName() << __FUNCTION__;
+		emit sig_Destroyed(&node, this);
+		Clear();
+		if (gui != nullptr)
+		{
+			delete gui;
+			gui = nullptr;
+		}
+		_amount--;
+	}
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
@@ -115,6 +128,7 @@ public:
 	virtual QStringList Write()const { throw "Not Implement"; }//TODO:持久化，保存节点信息和结构（*是否保存数据？）
 	virtual void Read(QStringList) { throw "Not Implement"; }//TODO:从持久化信息中恢复
 	virtual QString GetGuiAdvice()const { return "normal"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
+	static size_t GetAmount() { return _amount; }
 
 	QVariant data;//数据
 	QVariant defaultData;//默认值
@@ -160,6 +174,7 @@ protected:
 			isActivated = false;
 		}
 	}
+	static size_t _amount;
 };
 class AlgGraphVertex_Input
 	:public AlgGraphVertex
@@ -244,6 +259,8 @@ public:
 	void DetachGui() { assert(_gui != nullptr); _gui = nullptr; }//TODO:检查GuiGraphNode析构后的安全性
 	bool isHasGui()const { return _gui != nullptr; }
 	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
+
+	static size_t GetAmount() { return _amount; }
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
@@ -294,6 +311,7 @@ protected:
 	std::atomic_bool _stop = false;//结束标志
 
 	QPointer<GuiGraphController> _gui = nullptr;
+	static size_t _amount;
 };
 
 class AlgGraphNode_Input
@@ -344,10 +362,6 @@ public:
 
 #pragma endregion
 
-
-
-
-
 enum
 {
 	VERTEX_TYPE = 65536 + 0x100,
@@ -363,14 +377,15 @@ public:
 	virtual ~GuiGraphItemArrow();
 	enum { Type = ARROW_TYPE };
 	virtual int type()const { return Type; }
+	static size_t GetAmount() { return _amount; }
 
 	void updatePosition();
 	virtual QRectF boundingRect(void) const { return QGraphicsLineItem::boundingRect(); }
-	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) { QGraphicsLineItem::paint(painter, option, widget); }
+	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr);
 
 	const GuiGraphItemVertex*srcItemVertex, *dstItemVertex;//始末Vertex
 protected:
-
+	static size_t _amount;
 };
 class GuiGraphItemVertex
 	:public QGraphicsItem
@@ -380,6 +395,7 @@ public:
 	virtual ~GuiGraphItemVertex();
 	enum { Type = VERTEX_TYPE };
 	virtual int type()const { return Type; }
+	static size_t GetAmount() { return _amount; }
 
 	virtual QPointF ArrowAttachPosition()const//箭头连接点位置 
 	{
@@ -411,7 +427,8 @@ public:
 
 	const AlgGraphVertex&_vertex;
 	const GuiGraphItemNode&_nodeItem;
-	QList<GuiGraphItemArrow*>_arrows;
+	QList<GuiGraphItemArrow*>_arrows; 
+	static size_t _amount;
 
 	virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value)
 	{
@@ -437,10 +454,12 @@ public:
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);
 		//setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
 		setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
+		_amount++;
 	}
 	virtual ~GuiGraphItemNode();//析构时候自动解离
 	enum { Type = NODE_TYPE };
 	virtual int type()const { return Type; }
+	static size_t GetAmount() { return _amount; }
 
 	virtual void Refresh();
 
@@ -448,6 +467,7 @@ public:
 	QGraphicsTextItem title;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>inputItemVertex;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>outputItemVertex;
+	static size_t _amount;
 };
 //Node在Gui的控制器，更多的起到一个在AlgGraphNode和GuiGraphItemNode之间中转的作用
 class GuiGraphController
@@ -467,6 +487,7 @@ public:
 
 	virtual QVariant GetData() { throw "NotImplement"; }
 	virtual void SetData(QVariant var) { throw "NotImplement"; }
+	static size_t GetAmount() { return _amount; }
 
 	const AlgGraphNode& _node;//对相应AlgGraphNode的常引用，只读不可写
 signals:
@@ -477,6 +498,7 @@ protected:
 	GraphScene&_scene;
 	GuiGraphItemNode* _nodeItem = nullptr;//在场景中绘制和交互的物体，其析构时会自动解离
 	QPointer<QWidget> _panel = nullptr;//面板控件，TODO:后面要下放到相应输入输出子类当中
+	static size_t _amount;
 };
 
 class GuiGraphController_Input
@@ -571,7 +593,11 @@ private:
 	QList<AlgGraphNode*>_nodes;
 
 	QGraphicsItem*selectedItem = nullptr;
+	int _monitorTimerId = 0;
 
 	QThreadPool _pool;
+protected:
+	virtual void timerEvent(QTimerEvent *event) override;
+
 };
 
