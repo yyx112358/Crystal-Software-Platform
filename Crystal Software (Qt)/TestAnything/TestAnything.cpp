@@ -205,6 +205,13 @@ void TestAnything::timerEvent(QTimerEvent *event)
 #pragma region AlgGraphVertex
 size_t AlgGraphVertex::_amount = 0;
 
+AlgGraphVertex::AlgGraphVertex(AlgGraphNode&parent, QString name, VertexType vertexType)
+	:QObject(&parent), node(parent), vertexType(vertexType)
+{
+	setObjectName(name);
+	_amount++;
+}
+
 AlgGraphVertex::~AlgGraphVertex()
 {
 	qDebug() << objectName() << __FUNCTION__;
@@ -218,7 +225,7 @@ AlgGraphVertex::~AlgGraphVertex()
 	_amount--;
 }
 
-void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
+void AlgGraphVertex::Activate(QVariant var, bool isAct /*= true*/)
 {
 	if (isEnabled == true)
 	{
@@ -228,7 +235,12 @@ void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
 			if (f(this,var) == false)
 				throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
 
-		_Activate(var, isActivate);
+		if (isAct == true)
+			data = var;
+		else
+			data.clear();
+		isActivated = isAct;
+		emit sig_Activated(var, isAct);
 		emit sig_ActivateEnd();
 	}
 }
@@ -316,7 +328,7 @@ AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, boo
 	QString newName = name;//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	if (isInput == true)
 	{
-		pv = new AlgGraphVertex_Input(*this, newName);
+		pv = new AlgGraphVertex(*this, newName,AlgGraphVertex::VertexType::INPUT);
 		_inputVertex.insert(newName, pv);
 		connect(pv, &AlgGraphVertex::sig_Activated, this, &AlgGraphNode::Activate);
 		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
@@ -333,7 +345,7 @@ AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, boo
 	}
 	else
 	{
-		pv = new AlgGraphVertex_Output(*this, newName);
+		pv = new AlgGraphVertex(*this, newName,AlgGraphVertex::VertexType::OUTPUT);
 		_outputVertex.insert(newName, pv);
 		connect(pv, &AlgGraphVertex::sig_Destroyed, this, [this](AlgGraphNode*node, AlgGraphVertex*vertex)
 		{
@@ -368,10 +380,7 @@ void AlgGraphNode::RemoveVertex(QStringList names, bool isInput)
 		delete vtxs.value(name);
 }
 
-void AlgGraphNode::ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName)
-{
-	throw __FUNCTION__"Not Implement!";
-}
+
 void AlgGraphNode::DisconnectVertex(QString vertexName)
 {
 	throw __FUNCTION__"Not Implement!";
@@ -459,7 +468,7 @@ void AlgGraphNode::_LoadOutput(QVariantHash result)
 {
 	for (auto it = result.begin(); it != result.end(); ++it)
 	{
-		auto vtx = qobject_cast<AlgGraphVertex_Output*>(_outputVertex.value(it.key()));
+		auto vtx = _outputVertex.value(it.key());
 		if (vtx != nullptr)
 			vtx->data = it.value();
 		//else GraphWarning();//TODO:警告
@@ -502,7 +511,8 @@ QVariantHash AlgGraphNode_Add::_Run(QVariantHash data)
 #pragma endregion
 
 #pragma region GuiGraphItem
-GuiGraphItemVertex::GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVertex&vertex, bool isInput) :QGraphicsItem(&parent), _nodeItem(parent), _vertex(vertex), _isInput(isInput)
+GuiGraphItemVertex::GuiGraphItemVertex(GuiGraphItemNode&parent, const AlgGraphVertex&vertex) 
+	:QGraphicsItem(&parent), _nodeItem(parent), _vertex(vertex)
 {
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
@@ -513,7 +523,7 @@ GuiGraphItemVertex::~GuiGraphItemVertex()
 {
 	qDebug() << _vertex.objectName() << __FUNCTION__;
 	const_cast<AlgGraphVertex&>(_vertex).gui = nullptr;//TODO:后面改成Detach
-	if (_isInput == true)
+	if (_vertex.vertexType== AlgGraphVertex::VertexType::INPUT)
 		const_cast<GuiGraphItemNode&>(_nodeItem).inputItemVertex.remove(&_vertex);
 	else
 		const_cast<GuiGraphItemNode&>(_nodeItem).outputItemVertex.remove(&_vertex);
@@ -574,7 +584,7 @@ GuiGraphItemVertex* GuiGraphController::AddVertex(const AlgGraphVertex*vtx, cons
 	assert(_nodeItem != nullptr);
 	if (_nodeItem == nullptr)
 		return nullptr;
-	auto vtxItem = new GuiGraphItemVertex(*_nodeItem, *vtx, isInput);
+	auto vtxItem = new GuiGraphItemVertex(*_nodeItem, *vtx);
 	const_cast<AlgGraphVertex*>(vtx)->gui = vtxItem;
 	if(isInput==true)
 	{
