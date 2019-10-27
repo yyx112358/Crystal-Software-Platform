@@ -20,6 +20,7 @@ TestAnything::TestAnything(QWidget *parent)
 		auto gui = new GuiGraphController_Input(*node, _scene);
 		AddNode(*node, gui, QPointF(-100, 0));
 		ui.groupBox_Input->layout()->addWidget(gui->InitWidget(ui.groupBox_Input));
+		connect(gui, &GuiGraphController::sig_ValueChanged, node, &AlgGraphNode::Activate);
 	});
 	connect(ui.pushButton_NodeOutput, &QPushButton::clicked, this, [this](bool b)
 	{
@@ -34,9 +35,11 @@ TestAnything::TestAnything(QWidget *parent)
 		auto gui = new GuiGraphController(*node, _scene);
 		AddNode(*node, gui, QPointF(0, 0));
 	});
-	connect(ui.pushButton_5, &QPushButton::clicked, this, [this](bool b)
+	connect(ui.pushButton_NodeBuffer, &QPushButton::clicked, this, [this](bool b)
 	{
-		//_scene.clear();
+		auto node = new AlgGraphNode_Buffer(this, _pool);
+		auto gui = new GuiGraphController(*node, _scene);
+		AddNode(*node, gui, QPointF(0, 0));
 	});
 	connect(ui.pushButton_7, &QPushButton::clicked, this, [this](bool b)
 	{
@@ -130,11 +133,12 @@ bool TestAnything::AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVer
 					return;
 				}
 			}
-			throw "Can't Find";//TODO:改成相应Error
+			//throw "Can't Find";//TODO:改成相应Error【去掉这行是否无影响，有待观察】
 		}
 	}, Qt::UniqueConnection);//【注意这里务必加入UniqueConnection避免重复发送】
+
 	auto srcItem = srcVertex->gui, dstItem = dstVertex->gui;
-	b = srcItem != nullptr&&dstItem != nullptr;
+	b = srcItem != nullptr && dstItem != nullptr;
 	assert(b);	if (!b)	return true;//注意这里仍然返回true因为连接已成功，只是后面可以添加一个warning来提示
 	auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
 	arrow->setZValue(srcItem->zValue() - 0.2);
@@ -201,6 +205,19 @@ void TestAnything::timerEvent(QTimerEvent *event)
 #pragma region AlgGraphVertex
 size_t AlgGraphVertex::_amount = 0;
 
+AlgGraphVertex::~AlgGraphVertex()
+{
+	qDebug() << objectName() << __FUNCTION__;
+	emit sig_Destroyed(&node, this);
+	Clear();
+	if (gui != nullptr)
+	{
+		delete gui;
+		gui = nullptr;
+	}
+	_amount--;
+}
+
 void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
 {
 	if (isEnabled == true)
@@ -208,13 +225,14 @@ void AlgGraphVertex::Activate(QVariant var, bool isActivate /*= true*/)
 		qDebug() << node.objectName() + ':' + objectName() << __FUNCTION__;
 		emit sig_ActivateBegin();
 		for (auto f : assertFunctions)
-			if (f(var) == false)
+			if (f(this,var) == false)
 				throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
 
 		_Activate(var, isActivate);
 		emit sig_ActivateEnd();
 	}
 }
+
 #pragma endregion AlgGraphVertex
 
 #pragma region AlgGraphNode
@@ -275,6 +293,19 @@ void AlgGraphNode_Add::Init()
 	AddVertex("in1", "in", true);
 	AddVertex("in2", "in", true);
 	AddVertex("out", "out", false);
+}
+void AlgGraphNode_Buffer::Init()
+{
+	AlgGraphVertex*pv;
+	pv=AddVertex("in", "in", true);
+	pv = AddVertex("out", "out", false);
+	pv->assertFunctions.append([this](const AlgGraphVertex*const vtx, const QVariant&var)//连接节点数<=1
+	{
+		if (vtx->connectedVertexes.size() <= 1)
+			return true;
+		else
+			throw "No Attach To >1 vertexes!";
+	});
 }
 
 AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, bool isInput)
@@ -740,6 +771,7 @@ void GuiGraphItemArrow::paint(QPainter *painter, const QStyleOptionGraphicsItem 
 	QGraphicsLineItem::paint(painter, option, widget);
 }
 #pragma endregion GuiGraphItemArrow
+
 
 
 

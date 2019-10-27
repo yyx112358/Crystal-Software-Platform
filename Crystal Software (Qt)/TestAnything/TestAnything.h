@@ -53,18 +53,7 @@ public:
 		_amount++;
 	}
 
-	virtual ~AlgGraphVertex()
-	{
-		qDebug() << objectName() << __FUNCTION__;
-		emit sig_Destroyed(&node, this);
-		Clear();
-		if (gui != nullptr)
-		{
-			delete gui;
-			gui = nullptr;
-		}
-		_amount--;
-	}
+	virtual ~AlgGraphVertex();
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
@@ -81,9 +70,10 @@ public:
 		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
 		{
 			another->connectedVertexes.removeAll(this);
-			if (disconnect(another) == true)//清除连接
+			qDebug() << objectName() + '-' + another->objectName() << __FUNCTION__;
+			if (disconnect(this,&AlgGraphVertex::sig_Activated,another,&AlgGraphVertex::Activate) == true)//清除连接
 				emit sig_ConnectionRemoved(this, another);
-			/*else */if (another->disconnect(this) == true)
+			/*else */if (another->disconnect(another, &AlgGraphVertex::sig_Activated, this, &AlgGraphVertex::Activate) == true)
 				emit sig_ConnectionRemoved(another, this);
 		}
 	}
@@ -135,13 +125,14 @@ public:
 	QHash<QString, QVariant> additionInfo;//附加信息
 
 	QString description;//描述
-	QList<std::function<bool(const QVariant&)>> assertFunctions;//输入校验
+	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> assertFunctions;//输入校验
 
 	AlgGraphNode& node;//从属的节点
 	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
+	std::atomic_bool isReady = true;
 
 	GuiGraphItemVertex*gui = nullptr;//连接的图形//TODO:改成Node当中使用Attach和Detach函数并做检验的形式
 signals:
@@ -191,6 +182,12 @@ public:
 		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失//TODO:可以用Node的激活信号连接Activate(0,false)来实现
 					   //BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
 	}behavior = Behavior::KEEP;
+protected:
+// 	virtual void _Activate(QVariant var, bool isAct) override
+// 	{
+// 		throw std::logic_error("The method or operation is not implemented.");
+// 	}
+
 };
 class AlgGraphVertex_Output
 	:public AlgGraphVertex
@@ -267,6 +264,7 @@ signals:
 	void sig_ConnectionAdded();
 	void sig_ConnectionRemoved();
 
+	void sig_ActivateReady(AlgGraphNode*node);//节点可被激活
 	void sig_ActivatedFinished(AlgGraphNode*node);//节点被激活
 	void sig_RunFinished(AlgGraphNode*node);//运行结束
 	void sig_OutputFinished(AlgGraphNode*node);//输出结束
@@ -346,6 +344,7 @@ class AlgGraphNode_Add
 	Q_OBJECT
 public:
 	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
+	virtual ~AlgGraphNode_Add() {}
 	QHash<AlgGraphVertex*, int>idxTbl;//对应顺序
 	virtual void Init() override;
 protected:
@@ -359,7 +358,17 @@ class AlgGraphNode_Function
 public:
 
 };
+class AlgGraphNode_Buffer
+	:public AlgGraphNode
+{
+	Q_OBJECT
+public:
+	AlgGraphNode_Buffer(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
+	virtual ~AlgGraphNode_Buffer() {}
 
+	virtual void Init() override;
+
+};
 #pragma endregion
 
 enum
@@ -572,6 +581,7 @@ public:
 
 	AlgGraphNode& AddNode(AlgGraphNode&node, GuiGraphController*guiNode = nullptr, QPointF center = QPointF(0, 0));//添加已创建的node并配置相应的guiNode，如果guiNode为nullptr，则添加一个默认的
 	GuiGraphController* AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
+	//bool AddVertex()
 	bool AddConnection(AlgGraphNode&srcNode, QString srcNodeName, bool srcIsInput, AlgGraphNode&dstNode, QString dstNodeName, bool dstIsInput);
 	bool AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);//添加连接并显示
 	bool AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);//在GUI上添加连接（实际调用AddConnection(AlgGraphVertex*, AlgGraphVertex*)）
