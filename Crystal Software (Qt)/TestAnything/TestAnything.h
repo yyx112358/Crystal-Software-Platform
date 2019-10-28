@@ -51,6 +51,7 @@ public:
 	{
 		INPUT, OUTPUT
 	};
+	friend QDebug operator<<(QDebug&qd, VertexType vt) { qd << ((vt == VertexType::INPUT) ? "InputVertex" : "OutputVertex");	return qd; }
 	AlgGraphVertex(AlgGraphNode&parent, QString name, VertexType vertexType);
 	~AlgGraphVertex();
 
@@ -112,7 +113,7 @@ public:
 	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> assertFunctions;//输入校验
 
 	AlgGraphNode& node;//从属的节点
-	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口
+	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口//TODO:之后改成srcVertexes和dstVertexes
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
@@ -160,7 +161,7 @@ class AlgGraphNode
 {
 	Q_OBJECT
 public:
-	enum class RunMode
+	enum class RunMode:unsigned char
 	{
 		Thread,//多线程方式【默认】
 		Direct,//简单直接方式，不开多线程
@@ -176,13 +177,15 @@ public:
 	virtual void Release();
 	virtual QString GetGuiAdvice()const { return "normal"; }
 
-	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, bool isInput);//添加默认节点，并连接输入节点的sig_Activated()信号
-	virtual QHash<QString, AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, bool isInput);
-	virtual void RemoveVertex(QString name,bool isInput);
-	virtual void RemoveVertex(QStringList names, bool isInput);
-	virtual void ConnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName) {}
-	virtual void DisconnectVertex(QString vertexName);
-	virtual void DisconnectVertex(QString vertexName, AlgGraphNode&dstNode, QString dstVertexName);
+	virtual AlgGraphVertex* AddVertex(QString name, QVariant defaultValue, AlgGraphVertex::VertexType vertexType);//添加默认节点，并连接输入节点的sig_Activated()信号
+	virtual QHash<QString, AlgGraphVertex*> AddVertex(QHash<QString, QVariant>initTbl, AlgGraphVertex::VertexType vertexType);
+	virtual void RemoveVertex(QString name, AlgGraphVertex::VertexType vertexType);
+	virtual void RemoveVertex(QStringList names, AlgGraphVertex::VertexType vertexType);
+	virtual bool ConnectVertex(QString vertexName,AlgGraphVertex::VertexType vertexType, 
+		AlgGraphNode&dstNode, QString dstVertexName, AlgGraphVertex::VertexType dstVertexType);
+	virtual void DisconnectVertex(QString vertexName, AlgGraphVertex::VertexType vertexType);
+	virtual void DisconnectVertex(QString vertexName, AlgGraphVertex::VertexType vertexType,
+		AlgGraphNode&dstNode, QString dstVertexName, AlgGraphVertex::VertexType dstVertexType);
 
 	virtual void Write();
 	virtual void Read();
@@ -198,6 +201,7 @@ public:
 	bool isHasGui()const { return _gui != nullptr; }
 	const QHash<QString, AlgGraphVertex*>& GetVertexes(bool isInput)const { return isInput ? _inputVertex : _outputVertex; }
 
+	bool isRunning()const { return _isRunning; }
 	static size_t GetAmount() { return _amount; }
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
@@ -212,29 +216,15 @@ signals:
 
 	void sig_Destroyed(AlgGraphNode*node);
 protected:
-	//用于迭代处理_inputVertex和_outputVertex的模板函数，func是lambda表达式。函数将依次迭代vtxs中元素，如果不存在会输出错误并删除
-	//示例：_ProcessVertex(_inputVertex,[this](AlgGraphVertex*vertex){vertex->Reset();})
-	template<typename F>
-	bool _ProcessVertex(QHash<QString, QPointer<AlgGraphVertex>>&vtxs, F const&func)
-	{
-		for (auto it = vtxs.begin(); it != vtxs.end();)
-		{
-			if (it->isNull() == false)
-			{
-				func(*it);
-				++it;
-			}
-			else
-			{
-				qDebug() << __FUNCTION__ << it.key() << "Not exist";
-				it = vtxs.erase(it);
-			}
-		}
-	}
 	virtual QVariantHash _LoadInput();/*自定义读取输入，默认直接将数据从Vertex当中复制一份，以免运行过程中输入被修改*/
 	virtual QVariantHash _Run(QVariantHash data);//主要的运行部分，【将在另一个线程中运行】
 	virtual void _LoadOutput(QVariantHash result);/*自定义加载输出，默认直接将数据从临时数据中加载到输出中*/
 
+	QHash<QString, AlgGraphVertex*>&_GetVertexes(AlgGraphVertex::VertexType vt) 
+	{ 
+		if (vt == AlgGraphVertex::VertexType::INPUT)return _inputVertex;
+		else return _outputVertex;
+	}
 	QHash<QString, AlgGraphVertex*>_inputVertex;//输入节点
 	QHash<QString, AlgGraphVertex*>_outputVertex;//输出节点
 
@@ -243,7 +233,8 @@ protected:
 	QReadWriteLock _lock;//锁【可能并不需要，因为读写参数都发生在主线程】
 
 	RunMode _mode = RunMode::Thread;//运行方式
-
+	
+	std::atomic_bool _isRunning = false;//运行标志。从所有信号确认激活后开始（在_LoadInput()前），在所有输出激活后结束(sig_OutputFinished()前)
 	std::atomic_bool _isEnable = true;//使能
 	std::atomic_bool _isUnchange = false;//不可在创建后修改
 	std::atomic_bool _pause = false;//暂停标志
@@ -304,10 +295,22 @@ class AlgGraphNode_Buffer
 {
 	Q_OBJECT
 public:
-	AlgGraphNode_Buffer(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) {  }
+	AlgGraphNode_Buffer(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { _mode = AlgGraphNode::RunMode::Direct; }
 	virtual ~AlgGraphNode_Buffer() {}
 
 	virtual void Init() override;
+	virtual bool ConnectVertex(QString vertexName, AlgGraphVertex::VertexType vertexType, AlgGraphNode&dstNode, QString dstVertexName, AlgGraphVertex::VertexType dstVertexType) override;
+
+
+	virtual void Reset() override { _qdata.clear(); _isActivatByNext = false; AlgGraphNode::Reset(); }
+
+protected:
+	virtual QVariantHash _LoadInput() override { return (_isActivatByNext) ? (QVariantHash()) : (AlgGraphNode::_LoadInput()); }
+	virtual QVariantHash _Run(QVariantHash data) override;
+	QQueue<QVariant>_qdata;
+	std::atomic_bool _isActivatByNext = false;
+
+	
 
 };
 #pragma endregion
@@ -417,6 +420,9 @@ public:
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>inputItemVertex;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>outputItemVertex;
 	static size_t _amount;
+
+	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+
 };
 //Node在Gui的控制器，更多的起到一个在AlgGraphNode和GuiGraphItemNode之间中转的作用
 class GuiGraphController
@@ -489,7 +495,7 @@ public:
 	GraphScene(QObject*parent) :QGraphicsScene(parent) {}
 	virtual ~GraphScene() { if (arrow != nullptr)delete arrow; }
 signals:
-	void sig_ConnectionAdded(GuiGraphItemVertex*src, GuiGraphItemVertex*dst);
+	void sig_ConnectionAdded(GuiGraphItemVertex&src, GuiGraphItemVertex&dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
@@ -523,8 +529,8 @@ public:
 	GuiGraphController* AddGuiNode(AlgGraphNode&node, GuiGraphController*guiNode, QPointF center = QPointF(0, 0));//给node添加显示部分，如果guiNode为nullptr则添加默认的
 	//bool AddVertex()
 	bool AddConnection(AlgGraphNode&srcNode, QString srcNodeName, bool srcIsInput, AlgGraphNode&dstNode, QString dstNodeName, bool dstIsInput);
-	bool AddConnection(AlgGraphVertex*srcVertex, AlgGraphVertex*dstVertex);//添加连接并显示
-	bool AddConnection(GuiGraphItemVertex*srcVertex, GuiGraphItemVertex*dstVertex);//在GUI上添加连接（实际调用AddConnection(AlgGraphVertex*, AlgGraphVertex*)）
+	bool AddConnection(AlgGraphVertex&srcVertex, AlgGraphVertex&dstVertex);//添加连接并显示
+	bool AddConnection(GuiGraphItemVertex&srcVertex, GuiGraphItemVertex&dstVertex);//在GUI上添加连接（实际调用AddConnection(AlgGraphVertex*, AlgGraphVertex*)）
 
 	void AddNodeAsAdvice(QString advice);//TODO:根据命令行添加
 
