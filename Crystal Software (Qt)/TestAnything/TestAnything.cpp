@@ -53,6 +53,7 @@ TestAnything::TestAnything(QWidget *parent)
 	});
 
 	connect(ui.actionStart, &QAction::triggered, this, &TestAnything::slot_Start);
+	connect(ui.actionStop, &QAction::triggered, this, &TestAnything::slot_Stop);
 	bool (TestAnything::*pAddConnection)(GuiGraphItemVertex&, GuiGraphItemVertex&) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
@@ -134,11 +135,18 @@ void TestAnything::RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst)
 
 void TestAnything::slot_Start(bool b)
 {
+	//ui.actionStart->setEnabled(false);
 	for (auto n : _nodes)
 	{
 		n->Reset();
 		n->Activate();
 	}
+}
+
+void TestAnything::slot_Stop(bool b)
+{
+	for (auto n : _nodes)
+		n->Stop(b);
 }
 
 void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
@@ -176,6 +184,7 @@ void TestAnything::timerEvent(QTimerEvent *event)
 		ui.lcdNumber_GuiItemNode->display(static_cast<int> (GuiGraphItemNode::GetAmount()));
 		ui.lcdNumber_GuiItemVertex->display(static_cast<int> (GuiGraphItemVertex::GetAmount()));
 		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
+		ui.lcdNumber_Running->display(static_cast<int> (AlgGraphNode::GetRunningAmount()));
 	}
 }
 #pragma endregion TestAnything
@@ -319,6 +328,7 @@ AlgGraphVertex* AlgGraphNode::AddVertex(QString name, QVariant defaultValue, Alg
 {
 	qDebug() << objectName() + ':' + name << vertexType << __FUNCTION__;
 	AlgGraphVertex* pv;
+	assert(_isUnchange == false);
 	assert(_inputVertex.contains(name) == false && _outputVertex.contains(name) == false);
 	QString newName = name;//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	if (vertexType == AlgGraphVertex::VertexType::INPUT)
@@ -431,12 +441,13 @@ void AlgGraphNode::Read()
 void AlgGraphNode::Activate()
 {
 	qDebug() << objectName() << __FUNCTION__;
-	if (_isRunning == false/*_result.isRunning() == false*/)//运行期间，阻塞输入
+	if (_isRunning == false && _stop == false)//运行期间，阻塞输入
 	{
 		for (auto v : _inputVertex)//检查是否全部激活
 			if (v->isActivated == false)
 				return;
 		_isRunning = true;
+		_runningAmount++;
 		Run();
 	}
 }
@@ -470,9 +481,12 @@ void AlgGraphNode::Output()
 {
 	//TODO:加锁
 	//qDebug() << "====Output====:" << QThread::currentThread();
+
 	if (_mode != RunMode::Direct)
 		_LoadOutput((_result.future().resultCount() > 0) ? (_result.result()) : (QVariantHash()));
 	//_result.setFuture(QFuture<QVariantHash>());
+	if (_stop == true)
+		return;
 	for (auto v : _outputVertex) 
 	{
 		if (v->data.isNull() == false) 
@@ -481,6 +495,7 @@ void AlgGraphNode::Output()
 			v->Reset();
 		}
 	}
+	_runningAmount--;
 	_isRunning = false;
 	emit sig_OutputFinished(this);
 }
@@ -513,6 +528,8 @@ void AlgGraphNode::_LoadOutput(QVariantHash result)
 }
 
 size_t AlgGraphNode::_amount = 0;
+
+size_t AlgGraphNode::_runningAmount = 0;
 
 QVariantHash AlgGraphNode::_Run(QVariantHash data)
 {

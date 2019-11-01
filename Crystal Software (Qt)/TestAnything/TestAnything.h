@@ -203,6 +203,7 @@ public:
 
 	bool isRunning()const { return _isRunning; }
 	static size_t GetAmount() { return _amount; }
+	static size_t GetRunningAmount() { return _runningAmount; }
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
@@ -242,6 +243,7 @@ protected:
 
 	QPointer<GuiGraphController> _gui = nullptr;
 	static size_t _amount;
+	static size_t _runningAmount;
 };
 
 class AlgGraphNode_Input
@@ -540,6 +542,7 @@ public:
 
 
 	void slot_Start(bool b);
+	void slot_Stop(bool b);
 
 private:
 	void slot_RemoveItems(QList<QGraphicsItem*>items);
