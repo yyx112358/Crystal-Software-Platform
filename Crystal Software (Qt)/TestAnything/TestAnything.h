@@ -57,6 +57,7 @@ public:
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
+	void Deactivate() { Activate(QVariant(), false); }
 	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
@@ -210,10 +211,10 @@ signals:
 	void sig_ConnectionAdded();
 	void sig_ConnectionRemoved();
 
-	void sig_ActivateReady(AlgGraphNode*node);//节点可被激活
-	void sig_ActivatedFinished(AlgGraphNode*node);//节点被激活
+	void sig_Activated(AlgGraphNode*node);//节点被激活
 	void sig_RunFinished(AlgGraphNode*node);//运行结束
 	void sig_OutputFinished(AlgGraphNode*node);//输出结束
+	void sig_ActivateReady(AlgGraphNode*node);//节点可被激活
 
 	void sig_Destroyed(AlgGraphNode*node);
 protected:
@@ -279,7 +280,7 @@ class AlgGraphNode_Add
 public:
 	AlgGraphNode_Add(QObject*parent, QThreadPool&pool) :AlgGraphNode(parent, pool) { setObjectName("Add"); }
 	virtual ~AlgGraphNode_Add() {}
-	QHash<AlgGraphVertex*, int>idxTbl;//对应顺序
+	//QHash<AlgGraphVertex*, int>idxTbl;//对应顺序
 	virtual void Init() override;
 protected:
 	virtual QVariantHash _Run(QVariantHash data) override;
@@ -292,6 +293,10 @@ class AlgGraphNode_Function
 public:
 
 };
+//缓冲同步节点，用于缓存和同步连接
+//将缓存所有输入在一个队列中，并逐个输出。
+//激活完下一个Node之后主动Deactivate连接的Vertex；下一个Node执行完成后主动发送下一个数据。（见ConnectVertex函数）
+//要求一个【输出Vertex只能连接一个】
 class AlgGraphNode_Buffer
 	:public AlgGraphNode
 {
@@ -303,14 +308,13 @@ public:
 	virtual void Init() override;
 	virtual bool ConnectVertex(QString vertexName, AlgGraphVertex::VertexType vertexType, AlgGraphNode&dstNode, QString dstVertexName, AlgGraphVertex::VertexType dstVertexType) override;
 
-
-	virtual void Reset() override { _qdata.clear(); _isActivatByNext = false; AlgGraphNode::Reset(); }
+	virtual void Reset() override { _qdata.clear(); _isActivateByNext = false; AlgGraphNode::Reset(); }
 
 protected:
-	virtual QVariantHash _LoadInput() override { return (_isActivatByNext) ? (QVariantHash()) : (AlgGraphNode::_LoadInput()); }
+	virtual QVariantHash _LoadInput() override { return (_isActivateByNext) ? (QVariantHash()) : (AlgGraphNode::_LoadInput()); }
 	virtual QVariantHash _Run(QVariantHash data) override;
 	QQueue<QVariant>_qdata;
-	std::atomic_bool _isActivatByNext = false;
+	std::atomic_bool _isActivateByNext = false;
 
 	
 
@@ -438,8 +442,8 @@ public:
 	virtual GuiGraphItemNode* InitApperance(QPointF center = QPointF(0, 0), QRectF size = QRectF(0, 0, 100, 100));//根据AlgGraphNode的信息初始化GuiGraphItemNode
 	virtual QWidget* InitWidget(QWidget*parent);
 
-	GuiGraphItemVertex*AddVertex(const AlgGraphVertex*vtx, const bool isInput);
-	GuiGraphItemArrow*AddConnection();
+	GuiGraphItemVertex*AddVertex(const AlgGraphVertex&vtx, const bool isInput);
+	GuiGraphItemArrow*AddConnection(AlgGraphVertex&srcVertex, AlgGraphVertex&dstVertex);
 	void DetachItem() { assert(_nodeItem != nullptr); _nodeItem = nullptr; }
 
 	virtual QVariant GetData() { throw "NotImplement"; }
