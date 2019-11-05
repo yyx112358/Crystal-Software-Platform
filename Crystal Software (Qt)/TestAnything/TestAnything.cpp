@@ -6,6 +6,7 @@
 #include <opencv.hpp>
 #include <functional>
 #include <vld.h>
+#include <QMessageBox>
 using namespace cv;
 
 #pragma region TestAnything
@@ -113,21 +114,29 @@ bool TestAnything::AddConnection(GuiGraphItemVertex&srcItemVertex, GuiGraphItemV
 
 bool TestAnything::AddConnection(AlgGraphVertex&srcVertex, AlgGraphVertex&dstVertex)
 {
-	//连接Alg Vertex
-	bool b = srcVertex.node.ConnectVertex(srcVertex.objectName(), srcVertex.vertexType,
-		dstVertex.node, dstVertex.objectName(), dstVertex.vertexType);
-	assert(b);
-	//连接Gui Vertex
-	auto srcItem = srcVertex.gui, dstItem = dstVertex.gui;
-	b = srcItem != nullptr && dstItem != nullptr;
-	assert(b);	if (!b)	return true;//注意这里仍然返回true因为连接已成功，只是后面可以添加一个warning来提示
-	auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
-	arrow->setZValue(srcItem->zValue() - 0.2);
-	srcItem->_arrows.append(arrow);
-	dstItem->_arrows.append(arrow);
-	_scene.addItem(arrow);
-	
-	return true;
+	try
+	{
+		//连接Alg Vertex
+		bool b = srcVertex.node.ConnectVertex(srcVertex.objectName(), srcVertex.vertexType,
+			dstVertex.node, dstVertex.objectName(), dstVertex.vertexType);
+		assert(b);
+		//连接Gui Vertex
+		auto srcItem = srcVertex.gui, dstItem = dstVertex.gui;
+		b = srcItem != nullptr && dstItem != nullptr;
+		assert(b);	if (!b)	return true;//注意这里仍然返回true因为连接已成功，只是后面可以添加一个warning来提示
+		auto arrow = new GuiGraphItemArrow(srcItem, dstItem);
+		arrow->setZValue(srcItem->zValue() - 0.2);
+		srcItem->_arrows.append(arrow);
+		dstItem->_arrows.append(arrow);
+		_scene.addItem(arrow);
+
+		return true;
+	}
+	catch (const char*s)
+	{
+		QMessageBox::information(this, "连接错误", s);
+		return false;
+	}
 }
 
 void TestAnything::RemoveConnection(AlgGraphVertex*src, AlgGraphVertex*dst)
@@ -220,7 +229,7 @@ void AlgGraphVertex::Activate(QVariant var, bool isAct /*= true*/)
 	{
 		qDebug() << node.objectName() + ':' + objectName() << __FUNCTION__;
 		emit sig_ActivateBegin();
-		for (auto f : assertFunctions)
+		for (auto f : inputAssertFunctions)
 			if (f(this,var) == false)
 				throw "AssertFail";//TODO:1.改成专用的GraphError；2.加入默认的类型确认部分
 
@@ -311,12 +320,13 @@ void AlgGraphNode_Buffer::Init()
 bool AlgGraphNode_Buffer::ConnectVertex(QString vertexName, AlgGraphVertex::VertexType vertexType, AlgGraphNode&dstNode, QString dstVertexName, AlgGraphVertex::VertexType dstVertexType)
 {
 	if (vertexType == AlgGraphVertex::VertexType::OUTPUT)
-		assert(_outputVertex.value(vertexName)->connectedVertexes.size() == 0);//输出端口最多连接一个
+		assert(_outputVertex.value(vertexName)->nextVertexes.size() == 0
+		&& _outputVertex.value(vertexName)->prevVertexes.size() == 0);//输出端口最多连接一个
 	if (AlgGraphNode::ConnectVertex(vertexName, vertexType, dstNode, dstVertexName, dstVertexType) == false)
 		return false;
-	connect(&_outputVertex.value(vertexName)->connectedVertexes[0]->node, &AlgGraphNode::sig_ActivateReady,
+	connect(&_outputVertex.value(vertexName)->nextVertexes[0]->node, &AlgGraphNode::sig_ActivateReady,
 		[this] { _isActivateByNext = true; Activate(); });//【下一个节点运行完毕后再向其激活】
-	connect(&_outputVertex.value(vertexName)->connectedVertexes[0]->node, &AlgGraphNode::sig_Activated,
+	connect(&_outputVertex.value(vertexName)->nextVertexes[0]->node, &AlgGraphNode::sig_Activated,
 		_outputVertex.value(vertexName),&AlgGraphVertex::Deactivate);//下一个节点激活后清空其输入
 	return true;
 }
@@ -389,9 +399,11 @@ bool AlgGraphNode::ConnectVertex(QString vertexName, AlgGraphVertex::VertexType 
 	auto dstVertex = dstNode._GetVertexes(dstVertexType).value(dstVertexName);
 	 
 	bool b = srcVertex != dstVertex //不允许指向同一个
-		&& srcVertex!=nullptr && dstVertex!=nullptr //非空
-		&& srcVertex->connectedVertexes.contains(dstVertex) == false//不允许重复的连接
-		&& dstVertex->connectedVertexes.contains(srcVertex) == false;
+		&& srcVertex != nullptr && dstVertex != nullptr //非空
+		&& srcVertex->nextVertexes.contains(dstVertex) == false
+		&& srcVertex->prevVertexes.contains(dstVertex) == false
+		&& dstVertex->nextVertexes.contains(srcVertex) == false
+		&& dstVertex->prevVertexes.contains(srcVertex) == false;//不允许重复和反向的连接
 	assert(b);
 	if (!b)	return false;
 
@@ -572,7 +584,7 @@ QVariantHash AlgGraphNode_Buffer::_Run(QVariantHash data)
 	QVariantHash result;
 	if (_isActivateByNext == false)
 		_qdata.push_back(data.value("in"));
-	if (_qdata.size() > 0 && _outputVertex.value("out")->connectedVertexes[0]->node.isRunning() == false) 
+	if (_qdata.size() > 0 && _outputVertex.value("out")->prevVertexes[0]->node.isRunning() == false) 
 	{
 		result.insert("out", _qdata.takeFirst());
 	}

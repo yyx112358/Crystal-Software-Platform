@@ -52,31 +52,33 @@ public:
 		INPUT, OUTPUT
 	};
 	friend QDebug operator<<(QDebug&qd, VertexType vt) { qd << ((vt == VertexType::INPUT) ? "InputVertex" : "OutputVertex");	return qd; }
+	
 	AlgGraphVertex(AlgGraphNode&parent, QString name, VertexType vertexType);
 	~AlgGraphVertex();
 
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
 	void Deactivate() { Activate(QVariant(), false); }
-	//连接两个节点，方向this=>dstVertex，主要是修改connectedVertexes并连接this=>dstVertex的激活信号
+	//连接两个节点，方向this=>dstVertex，主要是修改nextVertexes和dstVertex->prevVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
 		assert(dstVertex != nullptr);
-		connectedVertexes.append(dstVertex);
-		dstVertex->connectedVertexes.append(this);
+		nextVertexes.append(dstVertex);
+		dstVertex->prevVertexes.append(this);
 		emit sig_ConnectionAdded(this, dstVertex);
 	}
+	//断掉该vertex和another之间的连接，并发送sig_ConnectionRemoved(AlgGraphVertex*src, AlgGraphVertex*dst)信号（该信号从起点到终点，仅发送一次）
 	void Disconnect(AlgGraphVertex*another)
 	{
-		if (connectedVertexes.removeAll(another) > 0)//如果确实连接了another
+		if (nextVertexes.removeAll(another) == true)//如果确实连接了another
 		{
-			another->connectedVertexes.removeAll(this);
+			another->prevVertexes.removeAll(this);
 			qDebug() << objectName() + '-' + another->objectName() << __FUNCTION__;
-			if (disconnect(this,&AlgGraphVertex::sig_Activated,another,&AlgGraphVertex::Activate) == true)//清除连接
+			if (disconnect(this, &AlgGraphVertex::sig_Activated, another, &AlgGraphVertex::Activate) == true)//清除连接
 				emit sig_ConnectionRemoved(this, another);
-			/*else */if (another->disconnect(another, &AlgGraphVertex::sig_Activated, this, &AlgGraphVertex::Activate) == true)
-				emit sig_ConnectionRemoved(another, this);
 		}
+		else
+			another->Disconnect(this);
 	}
 	//重置，主要是清除运行时状态（图运行后会改变的，主要是数据及激活位）
 	void Reset()
@@ -85,19 +87,18 @@ public:
 		isActivated = false;
 		emit sig_Reseted(this);
 	}
-	//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点connectedVertexes）
+	//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点）
 	//TODO:是否加入isUnchange参数，设定其它参数是否可变？
 	void Clear()
 	{
 		Reset();
 		isEnabled = true;
-		while (connectedVertexes.size() > 0)//清除connectedVertexes
-		{
-			if (connectedVertexes.back().isNull() == false)//如果不是无效节点
-				Disconnect(connectedVertexes.back());//Disconnect()会清除本节点
-			else
-				connectedVertexes.pop_back();
-		}
+		//清除连接的节点
+		while (nextVertexes.size() > 0)
+			Disconnect(nextVertexes.front());//Disconnect()会清除本节点，所以不能用for auto
+		while (prevVertexes.size() > 0)
+			Disconnect(prevVertexes.front());
+
 		emit sig_Cleared(this);
 	}
 
@@ -111,10 +112,12 @@ public:
 	QHash<QString, QVariant> additionInfo;//附加信息
 
 	QString description;//描述
-	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> assertFunctions;//输入校验
+	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> inputAssertFunctions;//输入校验
+	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> connectAssertFunctions;//连接校验
 
 	AlgGraphNode& node;//从属的节点
-	QList<QPointer<AlgGraphVertex>> connectedVertexes;//连接到的端口//TODO:之后改成srcVertexes和dstVertexes
+	QList<AlgGraphVertex*> prevVertexes;//连接到的上一级端口
+	QList<AlgGraphVertex*> nextVertexes;//连接到的下一级端口
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
@@ -122,13 +125,19 @@ public:
 	VertexType vertexType;//类型
 
 	GuiGraphItemVertex*gui = nullptr;//连接的图形//TODO:改成Node当中使用Attach和Detach函数并做检验的形式
-	enum class Behavior :unsigned char
+	enum class InputBehavior :unsigned char
 	{
 		KEEP = 0,//一直保持激活状态和数据（默认）
 		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失//TODO:可以用Node的激活信号连接Activate(0,false)来实现
-		//BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
-	}behavior = Behavior::KEEP;
-
+		BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
+		BLOCK = 4,//阻塞
+	}behavior = InputBehavior::KEEP;
+	enum class OutputBehavior :unsigned char
+	{
+		DISPOSABLE = 1,
+		BUFFER = 2,
+		BLOCK = 4,
+	};
 signals:
 	void sig_ActivateBegin();//激活开始
 	void sig_Activated(QVariant var, bool is_Activated);//激活信号，可用来激活下一个节点
@@ -142,13 +151,6 @@ signals:
 
 	void sig_Destroyed(AlgGraphNode*node, AlgGraphVertex*vertex);//删除成功
 protected:
-	//自定义激活部分，
-	//通过后，isAct为true【存储数据】，激活当前Vertex，该Vertex会【发送sig_Activated()】进一步激活；
-	//false则【清空数据】，且【不会发送】sig_Activated()进一步激活
-	virtual void _Activate(QVariant var, bool isAct)
-	{
-
-	}
 	static size_t _amount;
 };
 
@@ -208,8 +210,6 @@ public:
 signals:
 	void sig_VertexAdded(const AlgGraphVertex*vtx, bool isInput);
 	void sig_VertexRemoved(const AlgGraphVertex*vtx, bool isInput);
-	void sig_ConnectionAdded();
-	void sig_ConnectionRemoved();
 
 	void sig_Activated(AlgGraphNode*node);//节点被激活
 	void sig_RunFinished(AlgGraphNode*node);//运行结束
@@ -229,6 +229,8 @@ protected:
 	}
 	QHash<QString, AlgGraphVertex*>_inputVertex;//输入节点
 	QHash<QString, AlgGraphVertex*>_outputVertex;//输出节点
+	QList<AlgGraphVertex*>_inputVertexOrder;//TODO:输入节点运行次序
+	QList<AlgGraphVertex*>_outputVertexOrder;//TODO:输出节点运行次序
 
 	QFutureWatcher<QVariantHash> _result;//程序运行观测器
 	QThreadPool&_pool;//使用的线程池
