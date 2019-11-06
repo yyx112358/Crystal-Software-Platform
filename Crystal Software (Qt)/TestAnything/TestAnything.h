@@ -40,6 +40,32 @@ class GraphWarning;
 
 class TestAnything;
 
+class GraphError
+	:QException
+{
+public:
+	enum ErrorCode
+	{
+		AssertFail,
+	}code;
+	QString	err;
+	QString file;
+	QString	func;
+	int	line;
+	QString msg;
+
+	GraphError(ErrorCode code, QString err, QString file, QString func, int line)
+		:code(code), err(err), file(file), func(func), line(line)
+	{
+		msg = QString("[GraphError %1]\n").arg(code) + err + '\n' + file + '\n' + func + '\n' + QString::number(line);
+	}
+	virtual QException * clone() const override { return new GraphError(*this); }
+	virtual void raise()const { throw *this; }
+	virtual char const* what() const override { return msg.toStdString().data(); }
+#define GRAPH_ASSERT(expr)	do { if (!!(expr)); else GraphError(GraphError::AssertFail, #expr, __FUNCTION__, __FILE__, __LINE__).raise(); } while (0)
+};
+
+
 #pragma region AlgGraphVertex
 //Alg的Vertex，主要负责数据存储、传递、激活的工作
 class AlgGraphVertex
@@ -59,6 +85,24 @@ public:
 	//《激活函数》如果使能（isEnable==true）首先调用所有的assertFunction做校验，通过后【调用_Activate()函数】
 	void Activate(QVariant var, bool isActivate = true);
 	void Deactivate() { Activate(QVariant(), false); }
+	void slot_ActivateSuccess()
+	{
+		switch (behavior)
+		{
+		case AlgGraphVertex::InputBehavior::KEEP:
+			break;
+		case AlgGraphVertex::InputBehavior::DISPOSABLE:
+			isActivated = false;
+			data.clear();
+			break;
+		case AlgGraphVertex::InputBehavior::BUFFER:
+			break;
+		case AlgGraphVertex::InputBehavior::BLOCK:
+			break;
+		default:
+			break;
+		}
+	}
 	//连接两个节点，方向this=>dstVertex，主要是修改nextVertexes和dstVertex->prevVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
@@ -70,7 +114,7 @@ public:
 	//断掉该vertex和another之间的连接，并发送sig_ConnectionRemoved(AlgGraphVertex*src, AlgGraphVertex*dst)信号（该信号从起点到终点，仅发送一次）
 	void Disconnect(AlgGraphVertex*another)
 	{
-		if (nextVertexes.removeAll(another) == true)//如果确实连接了another
+		if (nextVertexes.removeAll(another) > 0)//如果确实连接了another
 		{
 			another->prevVertexes.removeAll(this);
 			qDebug() << objectName() + '-' + another->objectName() << __FUNCTION__;
@@ -101,7 +145,7 @@ public:
 
 		emit sig_Cleared(this);
 	}
-
+	void Release();
 	QStringList Write()const { throw "Not Implement"; }//TODO:持久化，保存节点信息和结构（*是否保存数据？）
 	void Read(QStringList) { throw "Not Implement"; }//TODO:从持久化信息中恢复
 	QString GetGuiAdvice()const { return "normal"; }//TODO:对工厂类给出的GUI建议，可能采用类似命令行的方式
@@ -124,13 +168,12 @@ public:
 	//std::atomic_bool isReady = true;
 	VertexType vertexType;//类型
 
-	GuiGraphItemVertex*gui = nullptr;//连接的图形//TODO:改成Node当中使用Attach和Detach函数并做检验的形式
 	enum class InputBehavior :unsigned char
 	{
 		KEEP = 0,//一直保持激活状态和数据（默认）
 		DISPOSABLE = 1,//一次性，激活一次后信号和数据消失//TODO:可以用Node的激活信号连接Activate(0,false)来实现
 		BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
-		BLOCK = 4,//阻塞
+		BLOCK = 4,//阻塞【没想清楚这个的具体行为和应用场景，暂且先不实现】
 	}behavior = InputBehavior::KEEP;
 	enum class OutputBehavior :unsigned char
 	{
@@ -138,6 +181,7 @@ public:
 		BUFFER = 2,
 		BLOCK = 4,
 	};
+	GuiGraphItemVertex*gui = nullptr;//连接的图形//TODO:改成Node当中使用Attach和Detach函数并做检验的形式
 signals:
 	void sig_ActivateBegin();//激活开始
 	void sig_Activated(QVariant var, bool is_Activated);//激活信号，可用来激活下一个节点
@@ -149,6 +193,8 @@ signals:
 	void sig_Cleared(AlgGraphVertex*);//清空成功
 	void sig_Released(AlgGraphVertex*);//释放成功
 
+	void sig_ReportWarning(GraphError&e);//报告警告（不会中断当前过程，只是报告）
+	void sig_ReportError(GraphError&e);//报告错误（当前执行部分已被中断）
 	void sig_Destroyed(AlgGraphNode*node, AlgGraphVertex*vertex);//删除成功
 protected:
 	static size_t _amount;
@@ -245,8 +291,8 @@ protected:
 	std::atomic_bool _stop = false;//结束标志
 
 	QPointer<GuiGraphController> _gui = nullptr;
-	static size_t _amount;
-	static size_t _runningAmount;
+	static std::atomic_uint64_t _amount;
+	static std::atomic_uint64_t _runningAmount;
 };
 
 class AlgGraphNode_Input
@@ -317,9 +363,7 @@ protected:
 	virtual QVariantHash _Run(QVariantHash data) override;
 	QQueue<QVariant>_qdata;
 	std::atomic_bool _isActivateByNext = false;
-
-	
-
+	std::atomic_bool _isFlatArray = false;
 };
 #pragma endregion
 
