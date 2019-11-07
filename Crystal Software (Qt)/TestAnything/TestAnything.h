@@ -47,6 +47,7 @@ public:
 	enum ErrorCode
 	{
 		AssertFail,
+		NotImplement,
 	}code;
 	QString	err;
 	QString file;
@@ -63,8 +64,13 @@ public:
 	virtual void raise()const { throw *this; }
 	virtual char const* what() const override { return msg.toStdString().data(); }
 #define GRAPH_ASSERT(expr)	do { if (!!(expr)); else GraphError(GraphError::AssertFail, #expr, __FUNCTION__, __FILE__, __LINE__).raise(); } while (0)
+#define GRAPH_NOT_IMPLEMENT GraphError(GraphError::NotImplement, "Not Implement", __FUNCTION__, __FILE__, __LINE__).raise();
 };
-
+enum State
+{
+	State_Init,
+	State_Running,
+};
 
 #pragma region AlgGraphVertex
 //Alg的Vertex，主要负责数据存储、传递、激活的工作
@@ -106,7 +112,9 @@ public:
 	//连接两个节点，方向this=>dstVertex，主要是修改nextVertexes和dstVertex->prevVertexes并连接this=>dstVertex的激活信号
 	void Connect(AlgGraphVertex*dstVertex)
 	{
-		assert(dstVertex != nullptr);
+		GRAPH_ASSERT(dstVertex != nullptr);
+		for (auto f : connectAssertFunctions)
+			GRAPH_ASSERT(f(this, dstVertex));
 		nextVertexes.append(dstVertex);
 		dstVertex->prevVertexes.append(this);
 		emit sig_ConnectionAdded(this, dstVertex);
@@ -157,7 +165,7 @@ public:
 
 	QString description;//描述
 	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> inputAssertFunctions;//输入校验
-	QList<std::function<bool(const AlgGraphVertex*const, const QVariant&)>> connectAssertFunctions;//连接校验
+	QList<std::function<bool(const AlgGraphVertex*const, const AlgGraphVertex*const)>> connectAssertFunctions;//连接校验
 
 	AlgGraphNode& node;//从属的节点
 	QList<AlgGraphVertex*> prevVertexes;//连接到的上一级端口
@@ -175,12 +183,6 @@ public:
 		BUFFER = 2,//缓冲，缓冲输入数据//TODO:这个现在的想法是使用Buffer Node实现
 		BLOCK = 4,//阻塞【没想清楚这个的具体行为和应用场景，暂且先不实现】
 	}behavior = InputBehavior::KEEP;
-	enum class OutputBehavior :unsigned char
-	{
-		DISPOSABLE = 1,
-		BUFFER = 2,
-		BLOCK = 4,
-	};
 	GuiGraphItemVertex*gui = nullptr;//连接的图形//TODO:改成Node当中使用Attach和Detach函数并做检验的形式
 signals:
 	void sig_ActivateBegin();//激活开始
@@ -463,18 +465,25 @@ public:
 	virtual ~GuiGraphItemNode();//析构时候自动解离
 	enum { Type = NODE_TYPE };
 	virtual int type()const { return Type; }
-	static size_t GetAmount() { return _amount; }
 
+	virtual QSharedPointer<QMenu> GetDefaultMenu();//设定菜单，内部有个static QMenu，用于该类内部共享
+	void SetMenu(QSharedPointer<QMenu>newMenu) { _menu = newMenu; }
+	const QSharedPointer<QMenu> GetMenu() { return _menu != nullptr ? _menu : GetDefaultMenu(); }//获取菜单
+	QSharedPointer<QMenu> CopyMenu()const { GRAPH_NOT_IMPLEMENT; }
+	virtual void slot_ProcessAction(QAction*action) { GRAPH_NOT_IMPLEMENT; }
+
+	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 	virtual void Refresh();
 
-	GuiGraphController&controller;
+	const GuiGraphController&controller;
 	QGraphicsTextItem title;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>inputItemVertex;
 	QHash<const AlgGraphVertex*, GuiGraphItemVertex*>outputItemVertex;
+
+	QSharedPointer<QMenu>_menu = nullptr;
+
+	static size_t GetAmount() { return _amount; }
 	static size_t _amount;
-
-	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
-
 };
 //Node在Gui的控制器，更多的起到一个在AlgGraphNode和GuiGraphItemNode之间中转的作用
 class GuiGraphController
@@ -500,6 +509,7 @@ public:
 signals:
 	void sig_Destroyed(GuiGraphController*node);//析构前发出的信号
 	void sig_ValueChanged();//TODO:后面要下放到相应输入输出子类当中
+	void sig_ActionTriggered(QAction*);
 protected:
 
 	GraphScene&_scene;
@@ -549,11 +559,13 @@ public:
 signals:
 	void sig_ConnectionAdded(GuiGraphItemVertex&src, GuiGraphItemVertex&dst);
 	void sig_RemoveItems(QList<QGraphicsItem*>items);
+	void sig_ActionTriggered(QGraphicsItem*item, QAction*action);
 protected:
 	virtual void mousePressEvent(QGraphicsSceneMouseEvent *event) override;//主要处理画线
 	virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event) override;
 	virtual void keyPressEvent(QKeyEvent *event) override;
-
+	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event);
+	
 	GuiGraphItemArrow*arrow = nullptr;
 };
 
@@ -596,10 +608,12 @@ public:
 
 private:
 	void slot_RemoveItems(QList<QGraphicsItem*>items);
+	void slot_ActionProcessor(QGraphicsItem*item, QAction*action);
 
 	Ui::TestAnythingClass ui;
 	GraphScene _scene;
 	QList<AlgGraphNode*>_nodes;
+	size_t _nodeSN = 0;
 
 	QGraphicsItem*selectedItem = nullptr;
 	int _monitorTimerId = 0;

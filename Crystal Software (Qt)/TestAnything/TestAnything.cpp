@@ -58,6 +58,7 @@ TestAnything::TestAnything(QWidget *parent)
 	bool (TestAnything::*pAddConnection)(GuiGraphItemVertex&, GuiGraphItemVertex&) = &TestAnything::AddConnection;//注意这里要这样写来区分重载函数
 	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, pAddConnection);
 	connect(&_scene, &GraphScene::sig_RemoveItems, this, &TestAnything::slot_RemoveItems);
+	connect(&_scene, &GraphScene::sig_ActionTriggered, this, &TestAnything::slot_ActionProcessor);
 	_monitorTimerId = startTimer(100, Qt::TimerType::CoarseTimer);
 }
 
@@ -189,6 +190,16 @@ void TestAnything::slot_RemoveItems(QList<QGraphicsItem*>items)
 	}
 }
 
+void TestAnything::slot_ActionProcessor(QGraphicsItem*item, QAction*action)
+{
+	static QStringList easyFeatures = { "Delete" };//可以在这里处理的简单工作，TODO:之后应该会改成宏定义并放在其它地方
+	if (easyFeatures.contains(action->objectName()) == true)
+	{
+		if (action->objectName() == "Delete")
+			slot_RemoveItems({ item });
+	}
+}
+
 void TestAnything::timerEvent(QTimerEvent *event)
 {
 	if (event->timerId() == _monitorTimerId)//用来监视避免内存泄露的
@@ -253,6 +264,7 @@ void AlgGraphVertex::Activate(QVariant var, bool isAct /*= true*/)
 AlgGraphNode::AlgGraphNode(QObject*parent, QThreadPool&pool)
 	:QObject(parent), _pool(pool)
 {
+	sizeof(QObject);
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, [this] {emit sig_RunFinished(this); });
 	connect(&_result, &QFutureWatcher<QVariantHash>::finished, this, &AlgGraphNode::Output);
 	_amount++;
@@ -533,7 +545,8 @@ void AlgGraphNode::Output()
 			Stop(true);
 		}
 	}
-	_result.setFuture(QFuture<QVariantHash>());
+	//_result.setFuture(QFuture<QVariantHash>());
+	//_result.();
 	if (_stop == false) 
 	{
 		for (auto v : _outputVertex)
@@ -631,7 +644,7 @@ QVariantHash AlgGraphNode_Buffer::_Run(QVariantHash data)
 		else
 			_qdata.push_back(data.value("in"));
 	}
-	if (_qdata.size() > 0 && _outputVertex.value("out")->prevVertexes[0]->node.isRunning() == false) 
+	if (_qdata.size() > 0 && _outputVertex.value("out")->nextVertexes[0]->node.isRunning() == false) 
 	{
 		result.insert("out", _qdata.takeFirst());
 	}
@@ -770,7 +783,7 @@ GuiGraphItemNode* GuiGraphController::InitApperance(QPointF center /*= QPointF(0
 GuiGraphItemNode::~GuiGraphItemNode()
 {
 	qDebug() << title.toPlainText() << __FUNCTION__;
-	controller.DetachItem();
+	const_cast<GuiGraphController&>(controller).DetachItem();
 	for (auto v : inputItemVertex.values())
 		delete v;
 	inputItemVertex.clear();
@@ -778,6 +791,21 @@ GuiGraphItemNode::~GuiGraphItemNode()
 		delete v;
 	outputItemVertex.clear();
 	_amount--;
+}
+
+QSharedPointer<QMenu> GuiGraphItemNode::GetDefaultMenu()
+{
+
+	static auto m = QSharedPointer<QMenu>::create();
+	if (m->actions().size() == 0) 
+	{
+		m->addAction("Delete")->setObjectName("A`Delete");
+		m->addAction("AddInput")->setObjectName("A`AddInput");
+		m->addAction("AddOutput")->setObjectName("A`AddOutput");
+		m->addAction("AddInput")->setObjectName("A`AddInput");
+		m->addAction("AddOutput")->setObjectName("A`AddOutput");
+	}
+	return m;
 }
 
 void GuiGraphItemNode::Refresh()
@@ -888,6 +916,37 @@ void GraphScene::keyPressEvent(QKeyEvent *event)
 	{
 		auto selects = this->selectedItems();
 		emit sig_RemoveItems(selects);
+	}
+}
+
+
+
+void GraphScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+{
+	auto pos = event->screenPos();
+	auto item = itemAt(event->scenePos(), QTransform());
+	if (item != nullptr)
+	{
+		QAction*result = nullptr;
+		switch (item->type())
+		{
+		case GuiGraphItemNode::Type:
+		{
+			auto n = qgraphicsitem_cast<GuiGraphItemNode*>(item);
+			result = n->GetMenu()->exec(pos);
+			break;
+		}
+		default:
+			break;
+		}
+		if (result != nullptr)
+		{
+			qDebug() << result->objectName() << result->text() << __FUNCTION__;
+			//if (0)
+			//	sendEvent(item, nullptr);
+			//else
+			emit sig_ActionTriggered(item, result);
+		}
 	}
 }
 #pragma endregion GraphScene
