@@ -12,6 +12,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Algorithm", "Algorithm\Algo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestAnything", "TestAnything\TestAnything.vcxproj", "{07D21040-C90B-4830-AE3F-AF2D24066937}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PluginTool", "PluginTool\PluginTool.vcxproj", "{2A2130E4-D385-4A6F-BB62-A9181751F720}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PluginApp", "PluginApp\PluginApp.vcxproj", "{6D991EF0-EABB-406E-85F9-74397EAC88E9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2A2130E4-D385-4A6F-BB62-A9181751F720} = {2A2130E4-D385-4A6F-BB62-A9181751F720}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PluginStaticTool", "PluginStaticTool\PluginStaticTool.vcxproj", "{AD6295F5-72C0-4F0E-936A-290D3844A821}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -38,6 +47,24 @@ Global
 		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x64.ActiveCfg = Release|x64
 		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x64.Build.0 = Release|x64
 		{07D21040-C90B-4830-AE3F-AF2D24066937}.Release|x86.ActiveCfg = Release|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Debug|x64.ActiveCfg = Debug|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Debug|x64.Build.0 = Debug|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Debug|x86.ActiveCfg = Debug|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Release|x64.ActiveCfg = Release|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Release|x64.Build.0 = Release|x64
+		{2A2130E4-D385-4A6F-BB62-A9181751F720}.Release|x86.ActiveCfg = Release|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Debug|x64.ActiveCfg = Debug|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Debug|x64.Build.0 = Debug|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Debug|x86.ActiveCfg = Debug|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Release|x64.ActiveCfg = Release|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Release|x64.Build.0 = Release|x64
+		{6D991EF0-EABB-406E-85F9-74397EAC88E9}.Release|x86.ActiveCfg = Release|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Debug|x64.ActiveCfg = Debug|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Debug|x64.Build.0 = Debug|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Debug|x86.ActiveCfg = Debug|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Release|x64.ActiveCfg = Release|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Release|x64.Build.0 = Release|x64
+		{AD6295F5-72C0-4F0E-936A-290D3844A821}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
