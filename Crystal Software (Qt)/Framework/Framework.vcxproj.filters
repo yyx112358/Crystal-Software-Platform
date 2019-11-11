@@ -6,43 +6,64 @@
       <Extensions>qrc;*</Extensions>
       <ParseFiles>false</ParseFiles>
     </Filter>
-    <Filter Include="Model">
-      <UniqueIdentifier>{57242164-3a35-4ea4-a8af-5d0a227e4dbb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Viewer">
-      <UniqueIdentifier>{0e1c87ee-491d-4aa4-8653-e1a9ea32882a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Controller">
-      <UniqueIdentifier>{1e540cb1-22e2-46f6-a1fa-30e8f4b170fb}</UniqueIdentifier>
+      <UniqueIdentifier>{0792bcbf-ee1a-4ef1-b326-67ae8f9c7c08}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_Global_">
+      <UniqueIdentifier>{4180501e-da03-4369-8328-f32b6775b9d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Controller\Form Files">
+      <UniqueIdentifier>{99349809-55BA-4b9d-BF79-8FDBB0286EB3}</UniqueIdentifier>
+      <Extensions>ui</Extensions>
+      <ParseFiles>true</ParseFiles>
+    </Filter>
+    <Filter Include="Controller\Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Controller\Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
     <Filter Include="Controller\Resource Files">
       <UniqueIdentifier>{D9D6E242-F8AF-46E4-B9FD-80ECBC20BA3E}</UniqueIdentifier>
       <Extensions>qrc;*</Extensions>
       <ParseFiles>false</ParseFiles>
     </Filter>
-    <Filter Include="Controller\Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="Model">
+      <UniqueIdentifier>{b483a438-a87f-4855-ae30-5e15bab1a822}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Controller\Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Controller\Form Files">
-      <UniqueIdentifier>{99349809-55BA-4b9d-BF79-8FDBB0286EB3}</UniqueIdentifier>
-      <Extensions>ui</Extensions>
+    <Filter Include="Viewer">
+      <UniqueIdentifier>{0514d4aa-389a-46c1-8747-b1043cd255c2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Controller.cpp">
       <Filter>Controller\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Controller\Source Files</Filter>
+    <ClCompile Include="entry.cpp">
+      <Filter>_Global_</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
-      <Filter>Controller\Source Files</Filter>
+      <Filter>_Global_</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="global.h">
+      <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="entry.h">
+      <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphError.h">
+      <Filter>Controller\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Interface_Factory.h">
+      <Filter>Controller\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Controller.h">
@@ -55,28 +76,6 @@
     </QtUic>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="Controller.qrc">
-      <Filter>Controller\Resource Files</Filter>
-    </QtRcc>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Readme.md" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="global.h" />
-    <ClInclude Include="stdafx.h">
-      <Filter>Controller\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Interface.h">
-      <Filter>Controller\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="GraphError.h">
-      <Filter>Controller\Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="Framework.rc">
-      <Filter>Controller\Resource Files</Filter>
-    </ResourceCompile>
   </ItemGroup>
 </Project>
