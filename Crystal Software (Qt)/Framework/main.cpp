@@ -1,12 +1,13 @@
-#include "PluginApp.h"
+#include "stdafx.h"
+#include "Controller.h"
 #include <QtWidgets/QApplication>
-#include <QtPlugin>
-//Q_IMPORT_PLUGIN(PluginStaticTool)
+
+#pragma comment( linker, "/subsystem:windows /entry:mainCRTStartup" )
 
 int main(int argc, char *argv[])
 {
 	QApplication a(argc, argv);
-	PluginApp w;
+	Controller w;
 	w.show();
 	return a.exec();
 }

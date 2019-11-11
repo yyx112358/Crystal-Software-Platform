@@ -1,8 +1,8 @@
 <UI version="4.0" >
- <class>PluginAppClass</class>
- <widget class="QMainWindow" name="PluginAppClass" >
+ <class>ControllerClass</class>
+ <widget class="QMainWindow" name="ControllerClass" >
   <property name="objectName" >
-   <string notr="true">PluginAppClass</string>
+   <string notr="true">ControllerClass</string>
   </property>
   <property name="geometry" >
    <rect>
@@ -13,7 +13,7 @@
    </rect>
   </property>
   <property name="windowTitle" >
-   <string>PluginApp</string>
+   <string>Controller</string>
   </property>
   <widget class="QMenuBar" name="menuBar" />
   <widget class="QToolBar" name="mainToolBar" />
@@ -23,7 +23,7 @@
  <layoutDefault spacing="6" margin="11" />
  <pixmapfunction></pixmapfunction>
  <resources>
-   <include location="PluginApp.qrc"/>
+   <include location="Controller.qrc"/>
  </resources>
  <connections/>
 </UI>
