@@ -102,8 +102,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AlgNode.cpp" />
+    <ClCompile Include="AlgVertex.cpp" />
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="entry.cpp" />
+    <ClCompile Include="GraphScene.cpp" />
+    <ClCompile Include="GuiConnection.cpp" />
+    <ClCompile Include="GuiNode.cpp" />
+    <ClCompile Include="GuiVertex.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -111,9 +117,15 @@
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Controller.h" />
+    <QtMoc Include="AlgVertex.h" />
+    <QtMoc Include="AlgNode.h" />
     <ClInclude Include="entry.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="GraphError.h" />
+    <QtMoc Include="GraphScene.h" />
+    <ClInclude Include="GuiConnection.h" />
+    <ClInclude Include="GuiNode.h" />
+    <ClInclude Include="GuiVertex.h" />
     <ClInclude Include="Interface_Factory.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

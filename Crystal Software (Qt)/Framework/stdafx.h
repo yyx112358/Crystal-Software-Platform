@@ -3,6 +3,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <QDebug>
+#include <QtConcurrent>
 
 #ifdef _DEBUG
 #include <vld.h>

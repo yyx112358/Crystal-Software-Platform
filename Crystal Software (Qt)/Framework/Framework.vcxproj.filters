@@ -47,6 +47,24 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>_Global_</Filter>
     </ClCompile>
+    <ClCompile Include="AlgVertex.cpp">
+      <Filter>Model</Filter>
+    </ClCompile>
+    <ClCompile Include="AlgNode.cpp">
+      <Filter>Model</Filter>
+    </ClCompile>
+    <ClCompile Include="GuiNode.cpp">
+      <Filter>Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="GuiVertex.cpp">
+      <Filter>Viewer</Filter>
+    </ClCompile>
+    <ClCompile Include="GraphScene.cpp">
+      <Filter>Controller\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GuiConnection.cpp">
+      <Filter>Viewer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="global.h">
@@ -64,10 +82,28 @@
     <ClInclude Include="Interface_Factory.h">
       <Filter>Controller\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GuiNode.h">
+      <Filter>Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="GuiVertex.h">
+      <Filter>Viewer</Filter>
+    </ClInclude>
+    <ClInclude Include="GuiConnection.h">
+      <Filter>Viewer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Controller.h">
       <Filter>Controller\Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="AlgVertex.h">
+      <Filter>Model</Filter>
+    </QtMoc>
+    <QtMoc Include="GraphScene.h">
+      <Filter>Controller\Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="AlgNode.h">
+      <Filter>Model</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
