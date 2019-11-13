@@ -2,6 +2,7 @@
 #include "global.h"
 #include <QObject>
 #include <QVariant>
+#include <atomic>
 
 class AlgVertex : public QObject
 {
@@ -31,4 +32,12 @@ public:
 
 	AlgVertex(QObject *parent);
 	~AlgVertex();
+
+	static size_t GetAmount() { return _amount; }
+protected:
+	QVariant data;
+
+private:
+	static std::atomic_uint64_t _amount;//类实例总数
 };
+

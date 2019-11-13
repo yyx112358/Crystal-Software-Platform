@@ -106,6 +106,7 @@
     <ClCompile Include="AlgVertex.cpp" />
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="entry.cpp" />
+    <ClCompile Include="Factory_Basic.cpp" />
     <ClCompile Include="GraphScene.cpp" />
     <ClCompile Include="GuiConnection.cpp" />
     <ClCompile Include="GuiNode.cpp" />
@@ -120,6 +121,7 @@
     <QtMoc Include="AlgVertex.h" />
     <QtMoc Include="AlgNode.h" />
     <ClInclude Include="entry.h" />
+    <QtMoc Include="Factory_Basic.h" />
     <ClInclude Include="global.h" />
     <ClInclude Include="GraphError.h" />
     <QtMoc Include="GraphScene.h" />

@@ -4,6 +4,7 @@
 #include "ui_Controller.h"
 #include "AlgNode.h"
 #include "GraphScene.h"
+#include "Factory_Basic.h"
 
 class FRAMEWORK_EXPORT Controller : public QMainWindow
 {
@@ -17,10 +18,13 @@ public:
 private:
 	Ui::Controller ui;
 
+	Factory_Basic _factory;
+
 	GraphScene _scene;
-	QHash<QString, QWeakPointer<AlgNode>>_nodeSearchTbl;//查找表
+	//QHash<QString, QWeakPointer<AlgNode>>_nodeSearchTbl;//查找表
 	QList<QSharedPointer<AlgNode>>_nodes;
 
+	void slot_CreateNode();
 	void slot_Start();
 	void slot_Pause(bool isPause);
 	void slot_Stop();

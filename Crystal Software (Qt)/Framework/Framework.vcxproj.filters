@@ -65,6 +65,9 @@
     <ClCompile Include="GuiConnection.cpp">
       <Filter>Viewer</Filter>
     </ClCompile>
+    <ClCompile Include="Factory_Basic.cpp">
+      <Filter>Controller\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="global.h">
@@ -104,6 +107,9 @@
     </QtMoc>
     <QtMoc Include="AlgNode.h">
       <Filter>Model</Filter>
+    </QtMoc>
+    <QtMoc Include="Factory_Basic.h">
+      <Filter>Controller\Header Files</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
