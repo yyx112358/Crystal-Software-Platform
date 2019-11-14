@@ -9,28 +9,35 @@
 class Interface_Factory
 {
 public:	
-	virtual const QHash<QString, AlgNode::FactoryInfo>& GetAlgNodeTbl()const = 0;
-	virtual const QHash<QString, GuiNode::FactoryInfo>& GetGuiNodeTbl()const = 0;
-
-	QStringList GetAlgNodeNames() { return GetAlgNodeTbl().keys(); }
-	QStringList GetGuiNodeNames() { return GetGuiNodeTbl().keys(); }
-
-	auto CreateAlgNode(QString classname)
+	virtual const QHash<QString, AlgNode::FactoryInfo>& GetAlgNodeTbl()const { return _algNodeTbl; }
+	QStringList GetAlgNodeNames() { return _algNodeTbl.keys(); }
+	QSharedPointer<AlgNode> CreateAlgNode(QString classname)
 	{
-		if (GetAlgNodeTbl().contains(classname) == true)
-			return GetAlgNodeTbl().value(classname).defaultConstructor();
+		if (_algNodeTbl.contains(classname) == true) 
+		{
+			auto node = _algNodeTbl.value(classname).defaultConstructor();
+			node->SetWeakRef(node);
+			return node;
+		}
 		else
-			//GRAPH_NOT_EXIST(_GetAlgNodeTbl(), classname);
 			throw GraphError(GraphError::NotExist, QString("[%1] Not Exist in [Factory]").arg( classname), __FUNCTION__, __FILE__, __LINE__);
 	}
-	auto CreateGuiNode(QString classname)
+
+	virtual const QHash<QString, GuiNode::FactoryInfo>& GetGuiNodeTbl()const { return _guiNodeTbl; }
+	QStringList GetGuiNodeNames() { return _guiNodeTbl.keys(); }
+	QSharedPointer<GuiNode> CreateGuiNode(QString classname,AlgNode&algnode)
 	{
-		if (GetGuiNodeTbl().contains(classname) == true)
-			return GetGuiNodeTbl().value(classname).defaultConstructor;
+		if (_guiNodeTbl.contains(classname) == true)
+			return _guiNodeTbl.value(classname).defaultConstructor(algnode);
 		else
 			throw GraphError(GraphError::NotExist, QString("[%1] Not Exist in [Factory]").arg(classname), __FUNCTION__, __FILE__, __LINE__);
 	}
+protected:
+	QHash<QString, AlgNode::FactoryInfo>_algNodeTbl;
+	QHash<QString, GuiNode::FactoryInfo>_guiNodeTbl;
 
+	virtual const QHash<QString, AlgNode::FactoryInfo>& GetDefaultAlgNodeTbl()const = 0;
+	virtual const QHash<QString, GuiNode::FactoryInfo>& GetDefaultGuiNodeTbl()const = 0;
 };
 #define FACTORYINFO_DECLARE_ALGNODE(nodeclass) AlgNode::FactoryInfo(#nodeclass,\
 	[]{return QSharedPointer<nodeclass>::create();})

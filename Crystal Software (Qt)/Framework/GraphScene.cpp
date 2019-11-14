@@ -8,4 +8,5 @@ GraphScene::GraphScene(QWidget *parent)
 
 GraphScene::~GraphScene()
 {
+	qDebug() << objectName() << __FUNCTION__;
 }
