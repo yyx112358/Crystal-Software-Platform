@@ -47,7 +47,7 @@ public:
 	virtual QString GetGuiAdvice()const { return QString(); }
 
 	void AttachGui(QSharedPointer<GuiNode>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
-	QWeakPointer<AlgNode>toWeakRef()const { return _weakRef; }
+	QWeakPointer<AlgNode>WeakRef()const { return _weakRef; }
 
 	static size_t GetAmount() { return _amount; }
 	static size_t GetRunningAmount() { return _runningAmount; }
@@ -66,6 +66,9 @@ protected:
 
 	QSharedPointer<GuiNode>_gui = nullptr;
 private:
+#ifdef _DEBUG
+	QString name;//调试用的，方便看名字
+#endif // _DEBUG
 	void SetWeakRef(QWeakPointer<AlgNode>wp) { _weakRef = wp; }
 	QWeakPointer<AlgNode>_weakRef;//自身的weakRef，用于
 

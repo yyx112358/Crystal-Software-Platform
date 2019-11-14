@@ -14,3 +14,10 @@
 
 #define SOFTWARE_VERSION 0x000001//版本号（MM = major, NN = minor, PP = patch）
 #define NAME2STR(name) #name//把表达式转变为字符串
+
+enum GuiType
+{
+	GuiType_Node = 0x10000 + 0x1000,
+	GuiType_Vertex = 0x10000 + 0x2000,
+	GuiType_Connection = 0x10000 + 0x3000,
+};

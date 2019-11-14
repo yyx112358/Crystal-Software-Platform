@@ -1,4 +1,5 @@
 #pragma once
+#include "global.h"
 #include "qgraphicsitem.h"
 class GuiVertex :
 	public QGraphicsObject
@@ -6,6 +7,8 @@ class GuiVertex :
 public:
 	GuiVertex();
 	virtual ~GuiVertex();
+	enum { Type = GuiType_Vertex };
+	virtual int type()const { return Type; }
 
 	static size_t GetAmount() { return _amount; }
 protected:

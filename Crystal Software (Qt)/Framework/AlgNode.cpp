@@ -8,6 +8,9 @@ AlgNode::AlgNode(QThreadPool&pool, QObject*parent)
 	:QObject(parent),_pool(pool)
 {
 	_amount++;
+#ifdef _DEBUG
+	connect(this, &AlgNode::objectNameChanged, [this](QString str) {name = str; });
+#endif // _DEBUG
 }
 
 

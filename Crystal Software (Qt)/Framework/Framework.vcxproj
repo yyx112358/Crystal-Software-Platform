@@ -126,7 +126,7 @@
     <ClInclude Include="GraphError.h" />
     <QtMoc Include="GraphScene.h" />
     <ClInclude Include="GuiConnection.h" />
-    <ClInclude Include="GuiNode.h" />
+    <QtMoc Include="GuiNode.h" />
     <ClInclude Include="GuiVertex.h" />
     <ClInclude Include="Interface_Factory.h" />
     <ClInclude Include="stdafx.h" />

@@ -16,6 +16,8 @@ public:
 	void Release();
 
 	void LoadFactory();
+
+	QSharedPointer<AlgNode> AddNode(QString nodeClassname, QString guiClassname = QString());
 private:
 	Ui::Controller ui;
 
@@ -26,10 +28,15 @@ private:
 	QList<QSharedPointer<AlgNode>>_nodes;
 	QList<QWeakPointer<AlgNode>>_resumeNodes;//TODO:用于暂停之后的重启
 
-	void slot_CreateNode();
+	void slot_CreateNodeByButton();
+	void slot_RemoveItems(QList<QGraphicsItem*>items);
+	void slot_Delete();
+
 	void slot_Start();
 	void slot_Pause(bool isPause);
 	void slot_Stop();
+
+	void slot_ProcessGuiAction(QWeakPointer<GuiNode>guiNode,QString action);
 
 	int _monitorTimerId = 0, _refreshTimerId = 1;
 	virtual void timerEvent(QTimerEvent *event) final;

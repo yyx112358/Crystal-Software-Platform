@@ -10,11 +10,13 @@ Controller::Controller(QWidget *parent)
 	//ui初始化
 	ui.setupUi(this);
 	ui.graphicsView->setScene(&_scene);
+	connect(&_scene, &GraphScene::sig_RemoveItems, this, &Controller::slot_RemoveItems, Qt::DirectConnection);
 	//连接信号
 	connect(ui.actionStart, &QAction::triggered, this, &Controller::slot_Start);
 	connect(ui.actionDebug, &QAction::triggered, [this]
 	{
-		_nodes.pop_front();
+		if (_nodes.empty() == false)
+			_nodes.pop_front();
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -67,35 +69,75 @@ void Controller::LoadFactory()
 		pbtn->setObjectName(n.key);//objectName必须是key
 		pbtn->setToolTip(n.description);
 		ui.gridLayout_Node->addWidget(pbtn, i / 4, i % 4);
-		connect(pbtn, &QPushButton::clicked, this, &Controller::slot_CreateNode);
+		connect(pbtn, &QPushButton::clicked, this, &Controller::slot_CreateNodeByButton);
 	}
 }
 
-void Controller::slot_CreateNode()
+
+
+QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiClassname /*= QString()*/)
 {
-	//auto node = QSharedPointer<AlgNode>::create(); 		
 	try
 	{
-		auto name = sender()->objectName();
-		QSharedPointer<AlgNode> node = _factory.CreateAlgNode(name);//生成失败会抛出异常
+		//生成AlgNode
+		QSharedPointer<AlgNode> node = _factory.CreateAlgNode(nodeClassname);//生成失败会抛出异常
 		connect(node.get(), &AlgNode::sig_Destroyed, this, [this](QWeakPointer<AlgNode>wp)//删除后自动从_nodes中删除
 		{
 			_nodes.removeOne(wp);
 		}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
-		node->setObjectName(node->metaObject()->className() + QString::number(_nodes.size()));
+		node->setObjectName(node->metaObject()->className() + QString::number(_nodes.size()));//简单重命名
 		node->Init();
-		
-		auto gui = _factory.GetGuiNodeTbl().contains(node->GetGuiAdvice())==true
-			? _factory.CreateGuiNode(node->GetGuiAdvice(),*node.get())
-			:_factory.CreateGuiNode("Basic.Basic", *node.get());//不会抛出异常，如果没有合适的，则生成一个基本GUI
+
+		//生成GuiNode
+		if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)
+		{
+			guiClassname = node->GetGuiAdvice();
+			if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)
+				guiClassname = "";
+		}
+		auto gui = _factory.CreateGuiNode(guiClassname, *node.get());//不会抛出异常，如果没有合适的，则生成一个基本GUI
 		node->AttachGui(gui);
+		//简单的移动，避免重叠
+		static QPointF nextLocation = QPointF(0, 0);
+		if (_scene.itemAt(QPointF(0, 0), QTransform()) == nullptr)
+			nextLocation = QPointF(0, 0);
+		else
+			nextLocation += QPointF(10, 10);
+		gui->setPos(nextLocation);
+		connect(gui.data(), &GuiNode::sig_SendActionToController, this, &Controller::slot_ProcessGuiAction, Qt::DirectConnection);
 		_scene.addItem(gui.get());
 
 		_nodes.append(node);//放在最后，保证如果中间出现异常node可以被析构
+		return node;
 	}
 	catch (GraphError&e)
 	{
 		QMessageBox::information(this, e.err, e.msg);
+		return nullptr;
+	}
+}
+
+void Controller::slot_CreateNodeByButton()
+{	
+	auto name = sender()->objectName();
+	AddNode(name);
+}
+
+void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
+{
+	for (auto item : items)
+	{
+		switch (item->type())
+		{
+		case GuiNode::Type:
+			_nodes.removeAll(qgraphicsitem_cast<GuiNode*>(item)->algnode);
+			break;
+		case GuiVertex::Type:
+			GRAPH_NOT_IMPLEMENT;
+			break;
+		default:
+			break;
+		}
 	}
 }
 
@@ -111,6 +153,25 @@ void Controller::slot_Start()
 	}
 }
 
+void Controller::slot_ProcessGuiAction(QWeakPointer<GuiNode>wp, QString action)
+{
+	auto guiNode = wp.lock();
+	switch (guiNode->type())
+	{
+	case GuiNode::Type:
+		if(action=="delete")
+			_nodes.removeAll(guiNode->algnode);
+		else
+			GRAPH_NOT_IMPLEMENT;
+		break;
+	case GuiVertex::Type:
+		GRAPH_NOT_IMPLEMENT;
+		break;
+	default:
+		break;
+	}
+}
+
 void Controller::timerEvent(QTimerEvent *event)
 {
 	if (event->timerId() == _monitorTimerId)//用来监视避免内存泄露的
@@ -122,5 +183,18 @@ void Controller::timerEvent(QTimerEvent *event)
 // 		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
 // 		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
 // 		ui.lcdNumber_Running->display(static_cast<int> (AlgGraphNode::GetRunningAmount()));
+	}
+	if (event->timerId() == _refreshTimerId)
+	{
+/*
+		static int it = 0; 
+		if (it % 2 == 0)
+		{
+			for (auto i = 0; i < 50; i++)
+				AddNode("");
+		}
+		else
+			Release();
+		it++;*/
 	}
 }

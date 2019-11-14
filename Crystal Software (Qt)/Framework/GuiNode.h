@@ -1,11 +1,14 @@
 #pragma once
+#include "global.h"
 #include "qgraphicsitem.h"
 #include <atomic>
 #include "AlgNode.h"
+#include "GuiVertex.h"
 
 class GuiNode :
 	public QGraphicsObject
 {
+	Q_OBJECT
 public:
 	struct FactoryInfo
 	{
@@ -19,17 +22,34 @@ public:
 			:key(key), title(key), description(description), defaultConstructor(defaultConstructor)
 		{}
 	};
-	GuiNode(AlgNode&parent);
+	enum { Type = GuiType_Node };
+	virtual int type()const { return Type; }
+
+	friend class Interface_Factory;
+	friend class QSharedPointer<GuiNode>;
+
 	virtual ~GuiNode();
 
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
+	QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
 	static size_t GetAmount() { return _amount; }
-	const AlgNode&algnode;
+	const QWeakPointer<AlgNode> algnode;
+signals:
+	void sig_SendActionToAlg(QWeakPointer<GuiNode>wp,QString action);
+	void sig_SendActionToController(QWeakPointer<GuiNode>wp, QString action);
 protected:
+	QMap<QString, QWeakPointer<GuiVertex>>_inputVertex;
+	QMap<QString, QWeakPointer<GuiVertex>>_outputVertex;
+
+	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 private:
+	GuiNode(AlgNode&parent);
+	void SetWeakRef(QWeakPointer<GuiNode>wp) { _weakRef = wp; }
+	QWeakPointer<GuiNode>_weakRef;//自身的weakRef，用于
+
 	static std::atomic_uint64_t _amount;//类实例总数
 };
 

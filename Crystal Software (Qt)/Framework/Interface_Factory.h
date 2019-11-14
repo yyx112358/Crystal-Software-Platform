@@ -27,8 +27,12 @@ public:
 	QStringList GetGuiNodeNames() { return _guiNodeTbl.keys(); }
 	QSharedPointer<GuiNode> CreateGuiNode(QString classname,AlgNode&algnode)
 	{
-		if (_guiNodeTbl.contains(classname) == true)
-			return _guiNodeTbl.value(classname).defaultConstructor(algnode);
+		if (_guiNodeTbl.contains(classname) == true) 
+		{
+			auto node = _guiNodeTbl.value(classname).defaultConstructor(algnode);
+			node->SetWeakRef(node);
+			return node;
+		}
 		else
 			throw GraphError(GraphError::NotExist, QString("[%1] Not Exist in [Factory]").arg(classname), __FUNCTION__, __FILE__, __LINE__);
 	}
