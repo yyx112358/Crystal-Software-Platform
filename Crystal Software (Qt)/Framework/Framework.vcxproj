@@ -123,7 +123,7 @@
     <ClInclude Include="entry.h" />
     <QtMoc Include="Factory_Basic.h" />
     <ClInclude Include="global.h" />
-    <ClInclude Include="GraphError.h" />
+    <QtMoc Include="GraphError.h" />
     <QtMoc Include="GraphScene.h" />
     <ClInclude Include="GuiConnection.h" />
     <QtMoc Include="GuiNode.h" />

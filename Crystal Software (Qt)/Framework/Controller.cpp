@@ -15,8 +15,12 @@ Controller::Controller(QWidget *parent)
 	connect(ui.actionStart, &QAction::triggered, this, &Controller::slot_Start);
 	connect(ui.actionDebug, &QAction::triggered, [this]
 	{
-		if (_nodes.empty() == false)
-			_nodes.pop_front();
+//  		auto nodes = findChildren<>(QString(), Qt::FindChildOption::FindDirectChildrenOnly);
+//  		for (auto &n : nodes)
+//  			qDebug() << n.objectName();
+
+// 		if (_nodes.empty() == false)
+// 			_nodes.pop_front();
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -24,6 +28,8 @@ Controller::Controller(QWidget *parent)
 // 		}
 	});
 	connect(ui.actionClear, &QAction::triggered, this, &Controller::Release);
+	GraphWarning::connectInform(this, [this](QString msg) {statusBar()->showMessage(msg, 2000); /*qDebug() << "Graph Infrom[" << msg << "]";*/ });
+	GraphWarning::connectWarning(this, [this](QString msg) {QMessageBox::warning(this, "Graph Warning", msg); });
 	//调用工厂
 	LoadFactory();
 	//监视器
@@ -89,7 +95,7 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 		node->Init();
 
 		//生成GuiNode
-		if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)
+		if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)//优先级：guiClassname>GetGuiAdvice()>默认
 		{
 			guiClassname = node->GetGuiAdvice();
 			if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)
@@ -104,6 +110,7 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 		else
 			nextLocation += QPointF(10, 10);
 		gui->setPos(nextLocation);
+
 		connect(gui.data(), &GuiNode::sig_SendActionToController, this, &Controller::slot_ProcessGuiAction, Qt::DirectConnection);
 		_scene.addItem(gui.get());
 
@@ -153,7 +160,7 @@ void Controller::slot_Start()
 	}
 }
 
-void Controller::slot_ProcessGuiAction(QWeakPointer<GuiNode>wp, QString action)
+void Controller::slot_ProcessGuiAction(QWeakPointer<GuiNode>wp, QString action, bool isChecked)
 {
 	auto guiNode = wp.lock();
 	switch (guiNode->type())
@@ -165,7 +172,10 @@ void Controller::slot_ProcessGuiAction(QWeakPointer<GuiNode>wp, QString action)
 			GRAPH_NOT_IMPLEMENT;
 		break;
 	case GuiVertex::Type:
-		GRAPH_NOT_IMPLEMENT;
+		if (action == "delete")
+			_nodes.removeAll(guiNode->algnode);
+		else
+			GRAPH_NOT_IMPLEMENT;
 		break;
 	default:
 		break;
@@ -198,3 +208,18 @@ void Controller::timerEvent(QTimerEvent *event)
 		it++;*/
 	}
 }
+
+// class Base
+// {
+// public:
+// 	struct bigdata {};
+// 	QSharedDataPointer<bigdata>copydata=GetDefault();
+// private:
+// 	virtual QSharedDataPointer<bigdata>GetDefault()const
+// 	{
+// 		static QSharedDataPointer<bigdata> data;
+// 		return data;
+// 	}
+// };
+
+QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;

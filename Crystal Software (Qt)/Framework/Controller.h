@@ -6,7 +6,7 @@
 #include "GraphScene.h"
 #include "Factory_Basic.h"
 
-class FRAMEWORK_EXPORT Controller : public QMainWindow
+class /*FRAMEWORK_EXPORT*/ Controller : public QMainWindow
 {
 	Q_OBJECT
 
@@ -18,6 +18,7 @@ public:
 	void LoadFactory();
 
 	QSharedPointer<AlgNode> AddNode(QString nodeClassname, QString guiClassname = QString());
+
 private:
 	Ui::Controller ui;
 
@@ -36,7 +37,7 @@ private:
 	void slot_Pause(bool isPause);
 	void slot_Stop();
 
-	void slot_ProcessGuiAction(QWeakPointer<GuiNode>guiNode,QString action);
+	void slot_ProcessGuiAction(QWeakPointer<GuiNode>guiNode, QString action, bool isChecked);
 
 	int _monitorTimerId = 0, _refreshTimerId = 1;
 	virtual void timerEvent(QTimerEvent *event) final;

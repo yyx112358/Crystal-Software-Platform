@@ -22,6 +22,11 @@ GuiNode::~GuiNode()
 	--_amount;
 }
 
+void GuiNode::InitApperance(QPointF center)
+{
+
+}
+
 QRectF GuiNode::boundingRect() const
 {
 	return QRectF(0, 0, 100, 100);
@@ -30,17 +35,23 @@ QRectF GuiNode::boundingRect() const
 void GuiNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
 {
 	//边框
-	auto oldpen = painter->pen();
+	//auto oldpen = painter->pen();
 	if (isSelected() == true)
 		painter->setPen(Qt::DashLine);
-	painter->drawRect(QRectF(0, 0, 100, 100));
-	painter->setPen(oldpen);
+	//painter->setBackgroundMode(Qt::OpaqueMode);
+	QPainterPath path;
+	path.addRoundRect(boundingRect(), 25);
+	painter->fillPath(path, Qt::white);
+	painter->drawRoundRect(boundingRect());
+	//painter->setPen(oldpen);	
 	//标题
 	painter->drawText(boundingRect().width() / 2 - option->fontMetrics.width(objectName())/2
 		, option->fontMetrics.height(), objectName());
 }
 void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 {
+	//static QSharedDataPointer<QString>defaultMenu;//TODO:之后可以用这种隐式共享指针来实现默认菜单。保证默认情况下共用一个默认表，而发生复制时候则自动复制
+	//QSharedDataPointer<QString>Menu=defaultMenu;
 	auto pos= event->screenPos();
 	QMenu menu;
 	QList<QAction*> insitu, ctrler, alg;
@@ -51,12 +62,19 @@ void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 	{
 		if (insitu.contains(result))
 		{
-
+			if (result->text() == "bring to front") 
+			{
+				float zvalue = zValue();
+				for (auto item : collidingItems())
+					if (item->zValue() >= zvalue && item->type() == GuiNode::Type)
+						zvalue = item->zValue() + 0.1;
+				setZValue(zvalue);
+			}
 		}
 		else if (ctrler.contains(result))
-			emit sig_SendActionToController(WeakRef(), result->text());
+			emit sig_SendActionToController(WeakRef(), result->text(),result->isChecked());
 		else if (alg.contains(result))
-			emit sig_SendActionToAlg(WeakRef(), result->text());
+			emit sig_SendActionToAlg(result->text(),result->isChecked());
 	}
 }
 

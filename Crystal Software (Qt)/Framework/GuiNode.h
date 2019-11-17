@@ -30,6 +30,10 @@ public:
 
 	virtual ~GuiNode();
 
+	virtual void InitApperance(QPointF center);
+
+	virtual QWidget* InitWidget(QWidget*parent) { return nullptr; }
+
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
@@ -37,11 +41,12 @@ public:
 	static size_t GetAmount() { return _amount; }
 	const QWeakPointer<AlgNode> algnode;
 signals:
-	void sig_SendActionToAlg(QWeakPointer<GuiNode>wp,QString action);
-	void sig_SendActionToController(QWeakPointer<GuiNode>wp, QString action);
+	void sig_SendActionToAlg(QString action, bool isChecked);
+	void sig_SendActionToController(QWeakPointer<GuiNode>wp, QString action, bool isChecked);
 protected:
 	QMap<QString, QWeakPointer<GuiVertex>>_inputVertex;
 	QMap<QString, QWeakPointer<GuiVertex>>_outputVertex;
+	QSharedPointer<QWidget>_panel;
 
 	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 

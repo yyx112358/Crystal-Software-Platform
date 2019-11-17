@@ -79,9 +79,6 @@
     <ClInclude Include="stdafx.h">
       <Filter>_Global_</Filter>
     </ClInclude>
-    <ClInclude Include="GraphError.h">
-      <Filter>Controller\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Interface_Factory.h">
       <Filter>Controller\Header Files</Filter>
     </ClInclude>
@@ -110,6 +107,9 @@
     </QtMoc>
     <QtMoc Include="GuiNode.h">
       <Filter>Viewer</Filter>
+    </QtMoc>
+    <QtMoc Include="GraphError.h">
+      <Filter>Controller\Header Files</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
