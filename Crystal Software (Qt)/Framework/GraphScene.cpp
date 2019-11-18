@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "GraphScene.h"
+#include "AlgVertex.h"
 #include "GuiNode.h"
+#include "GuiVertex.h"
 
 GraphScene::GraphScene(QWidget *parent)
 	: QGraphicsScene(parent)

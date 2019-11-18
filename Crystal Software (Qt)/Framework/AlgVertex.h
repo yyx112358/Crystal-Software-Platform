@@ -1,5 +1,6 @@
 #pragma once
 #include "global.h"
+#include "GraphError.h"
 #include <QObject>
 #include <QVariant>
 #include <atomic>
@@ -34,8 +35,10 @@ public:
 		RESET,//激活后清除数据
 	};
 
-	AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name, Behavior_DefaultActivateState defaultState,
-		Behavior_BeforeActivate beforeBehavior, Behavior_AfterActivate afterBehavior);
+	friend class AlgNode;
+	friend class QSharedPointer<AlgVertex>;
+	static QSharedPointer<AlgVertex>Create(QWeakPointer<AlgNode>parent, VertexType type, QString name, Behavior_DefaultActivateState defaultState,
+		Behavior_BeforeActivate beforeBehavior, Behavior_AfterActivate afterBehavior, QVariant defaultData = QVariant());
 	~AlgVertex();
 
 
@@ -45,31 +48,42 @@ public:
 	void SetBehaviorBefore(AlgVertex::Behavior_BeforeActivate val) { _behaviorBefore = val; }
 	AlgVertex::Behavior_DefaultActivateState GetBehaviorDefault() const { return _behaviorDefault; }
 	void SetBehaviorDefault(AlgVertex::Behavior_DefaultActivateState val) { _behaviorDefault = val; }
+
+	void AttachGui(QSharedPointer<GuiVertex>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
+	QWeakPointer<AlgVertex>WeakRef()const { return _weakRef; }
+
 	static size_t GetAmount() { return _amount; }
+	const VertexType type;
 protected:
+	AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name, Behavior_DefaultActivateState defaultState,
+		Behavior_BeforeActivate beforeBehavior, Behavior_AfterActivate afterBehavior, QVariant defaultData = QVariant());
+
 	//QVariant _data;
 	QQueue<QVariant>_qdata;//数据队列
 	QVariant _defaultData;//默认数据
 	QVariantMap additionInfo;//附加信息
-	QList<std::function<bool(const AlgVertex*const, const QVariant&)>>inputAssertFunctions;//输入校验。为true才会激活
-	QList<std::function<bool(const AlgVertex*const, const AlgVertex*const)>> connectAssertFunctions;//连接校验
+	QList<std::function<bool(/*const AlgVertex*const, */const QVariant&)>>inputAssertFunctions;//输入校验。为true才会激活//TODO:后面可能会改成带名字和std::function的自定义类
+	QList<std::function<bool(/*const AlgVertex*const, */const AlgVertex*const)>> connectAssertFunctions;//连接校验
 
 	QList<QWeakPointer<AlgVertex>> prevVertexes;//连接到的上一级端口
 	QList<QWeakPointer<AlgVertex>> nextVertexes;//连接到的下一级端口
 
 	std::atomic_bool isActivated = false;//激活标志
 	std::atomic_bool isEnabled = true;//使能标志
-	const VertexType _type;
+	
 	Behavior_AfterActivate _behaviorAfter;
 	Behavior_BeforeActivate _behaviorBefore;
 	Behavior_DefaultActivateState _behaviorDefault;
 
-	QWeakPointer<AlgNode>node;//从属的节点
-	QWeakPointer<GuiVertex>gui;
+	QWeakPointer<AlgNode>_node;//从属的节点
+	QWeakPointer<GuiVertex>_gui;
 private:
 #ifdef _DEBUG
 	QString __debugname;//调试用的，方便看名字
-#endif // _DEBUG
+#endif // _DEBUG	
+	void SetWeakRef(QWeakPointer<AlgVertex>wp) { GRAPH_ASSERT(_weakRef.isNull() == true); _weakRef = wp; }
+	QWeakPointer<AlgVertex>_weakRef;//自身的weakRef，用于代替this传递自身指针
+
 	static std::atomic_uint64_t _amount;//类实例总数
 };
 

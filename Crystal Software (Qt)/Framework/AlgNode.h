@@ -38,25 +38,31 @@ public:
 	friend class QSharedPointer<AlgNode>;
 
 	virtual ~AlgNode();
-	QSharedPointer<AlgNode>clone()const;
-	virtual void Write(){}
-	virtual void Read(){}
+	virtual void Release();
+	virtual QSharedPointer<AlgNode>Clone()const { GRAPH_NOT_IMPLEMENT; }
+	virtual void Write() { GRAPH_NOT_IMPLEMENT; }
+	virtual void Read() { GRAPH_NOT_IMPLEMENT; }
 
 	virtual void Init();//初始化一些参数，如果初始化后将_isUnchange设为true，则不能更改设定
-	virtual void Reset() {}//重置运行状态，清除所有运行时参数（运行后可变的参数）
-	virtual void Clear() {}
-	virtual void Release() {}
+	virtual void Reset() { GRAPH_NOT_IMPLEMENT; }//重置运行状态，清除所有运行时参数（运行后可变的参数）
+	virtual void Clear() { GRAPH_NOT_IMPLEMENT; }
+	
 
-
+	//自动添加顶点（默认为BUFFER）
+	virtual QWeakPointer<AlgVertex> AddVertexAuto(AlgVertex::VertexType vertexType, QString name = "", QVariant defaultData = QVariant());
 	virtual QWeakPointer<AlgVertex> AddVertex(AlgVertex::VertexType vertexType, QString name,
 		AlgVertex::Behavior_DefaultActivateState defaultState, AlgVertex::Behavior_BeforeActivate beforeBehavior,
-		AlgVertex::Behavior_AfterActivate afterBehavior, QVariant defaultValue = QVariant());
-	virtual QWeakPointer<AlgVertex> AddVertexAuto(AlgVertex::VertexType vertexType, QString name = "");
+		AlgVertex::Behavior_AfterActivate afterBehavior, QVariant defaultData = QVariant());//添加Vertex
+	virtual void RemoveVertex(AlgVertex::VertexType vertexType, QString name) { GRAPH_NOT_IMPLEMENT; }
+	virtual bool ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName,
+		AlgNode&dstNode, AlgVertex::VertexType dstVertexType, QString dstVertexName) { GRAPH_NOT_IMPLEMENT; }
+	virtual void DisconnectVertex(AlgVertex::VertexType vertexType, QString vertexName) { GRAPH_NOT_IMPLEMENT; }
 
 	void AttachGui(QSharedPointer<GuiNode>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
 	virtual QString GetGuiAdvice()const { return QString(); }
 
 	QStringList GetVertexNames(AlgVertex::VertexType type)const;
+	QList<QSharedPointer<const AlgVertex>> GetVertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<AlgNode>StrongRef()const { return _weakRef.lock(); }
 	QWeakPointer<AlgNode>WeakRef()const { return _weakRef; }
 
@@ -66,7 +72,8 @@ signals:
 	void sig_Destroyed(QWeakPointer<AlgNode>wp);
 protected:
 	AlgNode(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
-
+	QList<QSharedPointer<AlgVertex>>&_Vertexes(AlgVertex::VertexType type);
+	const QList<QSharedPointer<AlgVertex>>& _Vertexes(AlgVertex::VertexType type)const;
 
 	QList<QSharedPointer<AlgVertex>>_inputVertex;
 	QList<QSharedPointer<AlgVertex>>_outputVertex;
@@ -89,8 +96,9 @@ protected:
 private:
 #ifdef _DEBUG
 	QString __debugname;//调试用的，方便看名字
+	time_t __RunTime;//计时用的
 #endif // _DEBUG
-	void SetWeakRef(QWeakPointer<AlgNode>wp) { _weakRef = wp; }
+	void SetWeakRef(QWeakPointer<AlgNode>wp) { GRAPH_ASSERT(_weakRef.isNull() == true); _weakRef = wp; }
 	QWeakPointer<AlgNode>_weakRef;//自身的weakRef，用于代替this传递自身指针
 
 	static std::atomic_uint64_t _amount;//类实例总数

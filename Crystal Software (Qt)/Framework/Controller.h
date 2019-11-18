@@ -18,7 +18,6 @@ public:
 	void LoadFactory();
 
 	QSharedPointer<AlgNode> AddNode(QString nodeClassname, QString guiClassname = QString());
-
 private:
 	Ui::Controller ui;
 
@@ -31,7 +30,6 @@ private:
 
 	void slot_CreateNodeByButton();
 	void slot_RemoveItems(QList<QGraphicsItem*>items);
-	void slot_Delete();
 
 	void slot_Start();
 	void slot_Pause(bool isPause);

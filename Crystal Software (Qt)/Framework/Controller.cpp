@@ -19,8 +19,8 @@ Controller::Controller(QWidget *parent)
 //  		for (auto &n : nodes)
 //  			qDebug() << n.objectName();
 
-// 		if (_nodes.empty() == false)
-// 			_nodes.pop_front();
+		if (_nodes.empty() == false)
+			_nodes.pop_front();
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -44,7 +44,7 @@ Controller::~Controller()
 	{
 		Release();
 	}
-	catch (...)
+	catch (...)//如果无法避免Release()抛出异常，至少要无条件吞掉异常
 	{
 		qDebug() << "Error in " __FUNCTION__;
 		assert(0);
@@ -109,7 +109,7 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 			nextLocation = QPointF(0, 0);
 		else
 			nextLocation += QPointF(10, 10);
-		gui->setPos(nextLocation);
+		gui->InitApperance(nextLocation);
 
 		connect(gui.data(), &GuiNode::sig_SendActionToController, this, &Controller::slot_ProcessGuiAction, Qt::DirectConnection);
 		_scene.addItem(gui.get());
@@ -136,9 +136,18 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 	{
 		switch (item->type())
 		{
-		case GuiNode::Type:
-			_nodes.removeAll(qgraphicsitem_cast<GuiNode*>(item)->algnode);
+		case GuiNode::Type: 
+		{
+			auto target = qgraphicsitem_cast<GuiNode*>(item)->algnode;
+			for(auto it=_nodes.begin();it!=_nodes.end();++it)
+				if (it->data() == target.data())
+				{
+					_nodes.erase(it);
+					break;
+				}
+			//_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data()));
 			break;
+		}
 		case GuiVertex::Type:
 			GRAPH_NOT_IMPLEMENT;
 			break;
@@ -166,14 +175,15 @@ void Controller::slot_ProcessGuiAction(QWeakPointer<GuiNode>wp, QString action, 
 	switch (guiNode->type())
 	{
 	case GuiNode::Type:
-		if(action=="delete")
-			_nodes.removeAll(guiNode->algnode);
+		if (action == "delete")
+			//_nodes.removeAll(guiNode->algnode);
+			slot_RemoveItems({ guiNode.data() });
 		else
 			GRAPH_NOT_IMPLEMENT;
 		break;
 	case GuiVertex::Type:
 		if (action == "delete")
-			_nodes.removeAll(guiNode->algnode);
+		{	/*_nodes.removeAll(guiNode->algnode);*/}
 		else
 			GRAPH_NOT_IMPLEMENT;
 		break;
@@ -188,9 +198,8 @@ void Controller::timerEvent(QTimerEvent *event)
 	{
 		ui.lcdNumber_AlgNode->display(static_cast<int> (AlgNode::GetAmount()));
  		ui.lcdNumber_AlgVertex->display(static_cast<int> (AlgVertex::GetAmount()));
-// 		ui.lcdNumber_GuiController->display(static_cast<int> (GuiGraphController::GetAmount()));
  		ui.lcdNumber_GuiNode->display(static_cast<int> (GuiNode::GetAmount()));
-// 		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
+ 		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
 // 		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
 // 		ui.lcdNumber_Running->display(static_cast<int> (AlgGraphNode::GetRunningAmount()));
 	}
