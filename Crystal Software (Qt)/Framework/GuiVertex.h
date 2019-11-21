@@ -3,11 +3,13 @@
 #include "qgraphicsitem.h"
 #include "AlgVertex.h"
 
+class GuiNode;
+
 class GuiVertex :
 	public QGraphicsObject
 {
 public:
-	GuiVertex(QWeakPointer<const AlgVertex>vtx,QGraphicsItem*parent);
+	GuiVertex(QWeakPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode);
 	virtual ~GuiVertex();
 	enum { Type = GuiType_Vertex };
 	virtual int type()const { return Type; }
@@ -16,6 +18,7 @@ public:
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
 	static size_t GetAmount() { return _amount; }
+	const QWeakPointer<const GuiNode>guiNode;
 	const QWeakPointer<const AlgVertex>algVertex;
 protected:
 

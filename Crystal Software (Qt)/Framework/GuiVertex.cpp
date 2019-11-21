@@ -1,12 +1,14 @@
 #include "stdafx.h"
 #include "GuiVertex.h"
+#include "GuiNode.h"
 
-
-GuiVertex::GuiVertex(QWeakPointer<const AlgVertex>vtx, QGraphicsItem*parent)
-	:QGraphicsObject(parent),algVertex(vtx)
+GuiVertex::GuiVertex(QWeakPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode)
+	:QGraphicsObject(const_cast<GuiNode*>(gnode.data())), algVertex(vtx), guiNode(gnode)
 {
 	++_amount;
 	setObjectName(vtx.lock()->objectName());
+	setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
+	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
 }
 
 GuiVertex::~GuiVertex()
@@ -22,6 +24,8 @@ QRectF GuiVertex::boundingRect() const
 
 void GuiVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
 {
+	if (isSelected() == true)
+		painter->setPen(Qt::DashLine);
 	painter->drawRect(boundingRect());
 	painter->drawText(0, option->fontMetrics.height(), objectName());
 }

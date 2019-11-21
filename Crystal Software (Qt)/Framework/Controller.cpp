@@ -2,7 +2,7 @@
 #include "Controller.h"
 #include <QMessageBox>
 #include "GraphError.h"
-
+#include "GuiNode.h"
 
 Controller::Controller(QWidget *parent)
 	: QMainWindow(parent), _pool(this), _scene(this), _factory(this)
@@ -15,12 +15,12 @@ Controller::Controller(QWidget *parent)
 	connect(ui.actionStart, &QAction::triggered, this, &Controller::slot_Start);
 	connect(ui.actionDebug, &QAction::triggered, [this]
 	{
-//  		auto nodes = findChildren<>(QString(), Qt::FindChildOption::FindDirectChildrenOnly);
-//  		for (auto &n : nodes)
-//  			qDebug() << n.objectName();
+		auto n1 = AddNode("", ""), n2 = AddNode("", "");
+		n1->RemoveVertex(AlgVertex::VertexType::INPUT, "in");
+		n1->RemoveVertex(AlgVertex::VertexType::INPUT, "in_1");
+		n1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", n2, AlgVertex::VertexType::INPUT, "in");
+		n1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out_1", n2, AlgVertex::VertexType::INPUT, "in_1");
 
-		if (_nodes.empty() == false)
-			_nodes.pop_front();
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -87,10 +87,10 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 	{
 		//生成AlgNode
 		QSharedPointer<AlgNode> node = _factory.CreateAlgNode(nodeClassname);//生成失败会抛出异常
-		connect(node.get(), &AlgNode::sig_Destroyed, this, [this](QWeakPointer<AlgNode>wp)//删除后自动从_nodes中删除
-		{
-			_nodes.removeOne(wp);
-		}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
+// 		connect(node.get(), &AlgNode::sig_Destroyed, this, [this](QWeakPointer<AlgNode>wp)//删除后自动从_nodes中删除
+// 		{
+// 			_nodes.removeOne(wp);
+// 		}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
 		node->setObjectName(node->metaObject()->className() + QString::number(_nodes.size()));//简单重命名
 		node->Init();
 
@@ -132,25 +132,31 @@ void Controller::slot_CreateNodeByButton()
 
 void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 {
+	//原则上仅允许这里使用const_cast
 	for (auto item : items)
 	{
 		switch (item->type())
 		{
 		case GuiNode::Type: 
 		{
-			auto target = qgraphicsitem_cast<GuiNode*>(item)->algnode;
-			for(auto it=_nodes.begin();it!=_nodes.end();++it)
-				if (it->data() == target.data())
-				{
-					_nodes.erase(it);
-					break;
-				}
-			//_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data()));
+//			auto target = qgraphicsitem_cast<GuiNode*>(item)->algnode;
+// 			for(auto it=_nodes.begin();it!=_nodes.end();++it)
+// 				if (it->data() == target.data())
+// 				{
+// 					_nodes.erase(it);
+// 					break;
+// 				}
+			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->StrongRef());
 			break;
 		}
 		case GuiVertex::Type:
-			GRAPH_NOT_IMPLEMENT;
+		{
+  			auto guiVtx = qgraphicsitem_cast<GuiVertex*>(item);
+			auto algVtx = guiVtx->algVertex.lock();
+			auto algNode = guiVtx->guiNode.lock()->algnode.lock();
+			algNode.constCast<AlgNode>()->RemoveVertex(algVtx->type, algVtx->objectName());
 			break;
+		}
 		default:
 			break;
 		}
@@ -161,7 +167,11 @@ void Controller::slot_Start()
 {
 	try
 	{
-		GRAPH_NOT_IMPLEMENT;
+		for (auto &n : _nodes)
+		{
+			n->Reset();
+			n->Activate();
+		}
 	}
 	catch (GraphError&e)
 	{
@@ -201,7 +211,7 @@ void Controller::timerEvent(QTimerEvent *event)
  		ui.lcdNumber_GuiNode->display(static_cast<int> (GuiNode::GetAmount()));
  		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
 // 		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
-// 		ui.lcdNumber_Running->display(static_cast<int> (AlgGraphNode::GetRunningAmount()));
+ 		ui.lcdNumber->display(static_cast<int> (_nodes.size()));
 	}
 	if (event->timerId() == _refreshTimerId)
 	{

@@ -103,6 +103,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AlgNode.cpp" />
+    <ClCompile Include="AlgNode_Input.cpp" />
     <ClCompile Include="AlgVertex.cpp" />
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="entry.cpp" />
@@ -120,6 +121,7 @@
     <QtMoc Include="Controller.h" />
     <QtMoc Include="AlgVertex.h" />
     <QtMoc Include="AlgNode.h" />
+    <QtMoc Include="AlgNode_Input.h" />
     <ClInclude Include="entry.h" />
     <QtMoc Include="Factory_Basic.h" />
     <ClInclude Include="global.h" />

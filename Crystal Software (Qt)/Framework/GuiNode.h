@@ -35,7 +35,8 @@ public:
 	virtual ~GuiNode();
 
 	virtual void InitApperance(QPointF center);//根据调用时候的状态生成（全量更新）
-	virtual QWeakPointer<GuiVertex>AddVertex(QSharedPointer<const AlgVertex>vtx);//添加（增量更新）
+	virtual QWeakPointer<GuiVertex>AddVertex(QSharedPointer<AlgVertex>vtx);//添加（增量更新）
+	virtual void RemoveVertex(QSharedPointer<const AlgVertex>vtx);
 	virtual QSharedPointer<QWidget> InitWidget(QWidget*parent) { GRAPH_NOT_IMPLEMENT; }
 
 	virtual QRectF boundingRect() const override;

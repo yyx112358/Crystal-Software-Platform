@@ -33,17 +33,23 @@ void GuiNode::InitApperance(QPointF center)
 	setPos(center);
 	auto anode = algnode.lock();
 	for (auto avtx : anode->GetVertexes(AlgVertex::VertexType::INPUT))
-		AddVertex(avtx);
+		AddVertex(avtx.constCast<AlgVertex>());
 	for (auto avtx : anode->GetVertexes(AlgVertex::VertexType::OUTPUT))
-		AddVertex(avtx);
+		AddVertex(avtx.constCast<AlgVertex>());
 	_ArrangeLocation();
 }
 
-QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<const AlgVertex>vtx)
+QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
-	QSharedPointer<GuiVertex>gvtx = QSharedPointer<GuiVertex>::create(vtx, this);
+	QSharedPointer<GuiVertex>gvtx = QSharedPointer<GuiVertex>::create(vtx, WeakRef());
+	vtx->AttachGui(gvtx);
 	_Vertexes(vtx->type).append(gvtx);
 	return gvtx;
+}
+
+void GuiNode::RemoveVertex(QSharedPointer<const AlgVertex>vtx)
+{
+	_Vertexes(vtx->type).removeOne(vtx->GetGui());
 }
 
 QRectF GuiNode::boundingRect() const
