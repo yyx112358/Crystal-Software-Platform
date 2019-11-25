@@ -4,8 +4,8 @@
 #include "GuiVertex.h"
 #include <algorithm>
 
-GuiNode::GuiNode(AlgNode&parent)
-	:algnode(parent.WeakRef())
+GuiNode::GuiNode(QSharedPointer<AlgNode>parent)
+	:algnode(parent)
 {
 	++_amount;
 	auto node = algnode.lock();
@@ -18,6 +18,11 @@ GuiNode::GuiNode(AlgNode&parent)
 }
 
 
+bool GuiNode::RemoveFromParent()
+{
+	GRAPH_NOT_IMPLEMENT;
+}
+
 GuiNode::~GuiNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
@@ -27,6 +32,8 @@ GuiNode::~GuiNode()
 
 void GuiNode::InitApperance(QPointF center)
 {
+	if (_weakRef.isNull() == true && sharedFromThis().isNull() == false)
+		_weakRef = sharedFromThis(); 
 	_inputVertex.clear();
 	_outputVertex.clear();
 
@@ -41,7 +48,7 @@ void GuiNode::InitApperance(QPointF center)
 
 QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
-	QSharedPointer<GuiVertex>gvtx = QSharedPointer<GuiVertex>::create(vtx, WeakRef());
+	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, sharedFromThis());
 	vtx->AttachGui(gvtx);
 	_Vertexes(vtx->type).append(gvtx);
 	return gvtx;
@@ -103,7 +110,7 @@ void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 			}
 		}
 		else if (ctrler.contains(result))
-			emit sig_SendActionToController(WeakRef(), result->text(),result->isChecked());
+			emit sig_SendActionToController(sharedFromThis(), result->text(),result->isChecked());
 		else if (alg.contains(result))
 			emit sig_SendActionToAlg(result->text(),result->isChecked());
 	}

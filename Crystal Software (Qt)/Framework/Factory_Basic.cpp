@@ -36,24 +36,30 @@ QMap<QString, QStringList> Factory_Basic::LoadFromAnother(Interface_Factory&anot
 	return result;
 }
 
+#include "AlgNode_Input.h"
+#include "AlgNode_Output.h"
 QHash<QString, AlgNode::FactoryInfo>& Factory_Basic::GetDefaultAlgNodeTbl() const
 {
 	static QHash<QString, AlgNode::FactoryInfo>tbl =
 	{
  		{ "",AlgNode::FactoryInfo("",QStringLiteral("基本"),[] {return QSharedPointer<AlgNode>::create(); },QStringLiteral("基本节点")) },
- 		{ "Basic.Input",AlgNode::FactoryInfo("Basic.Input",[] {return QSharedPointer<AlgNode>::create(); }) },
- 		{ "Basic.Output",AlgNode::FactoryInfo("Basic.Output",[] {return QSharedPointer<AlgNode>::create(); }) },
+ 		{ "Basic.Input",AlgNode::FactoryInfo("Basic.Input",[] {return QSharedPointer<AlgNode_Input>::create(); }) },
+ 		{ "Basic.Output",AlgNode::FactoryInfo("Basic.Output",[] {return QSharedPointer<AlgNode_Output>::create(); }) },
 		{ "Basic.Add",AlgNode::FactoryInfo("Basic.Add",[] {return QSharedPointer<AlgNode>::create(); }) },
 		{ "Basic.Buffer",AlgNode::FactoryInfo("Basic.Buffer",[] {return QSharedPointer<AlgNode>::create(); }) },
 	};
 	return tbl;
 }
 
+#include "GuiNode_Input.h"
+#include "GuiNode_Output.h"
 QHash<QString, GuiNode::FactoryInfo>& Factory_Basic::GetDefaultGuiNodeTbl() const
 {
 	static QHash<QString, GuiNode::FactoryInfo>tbl =
 	{
-		{"",GuiNode::FactoryInfo("",[](AlgNode&node) {return QSharedPointer<GuiNode>::create(node); })}
+		{"",GuiNode::FactoryInfo("",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode>::create(node); })},
+		{"Basic.Input",GuiNode::FactoryInfo("Basic.Input",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode_Input>::create(node); })},
+		{"Basic.Output",GuiNode::FactoryInfo("Basic.Output",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode_Output>::create(node); }) },
 	};
 	return tbl;
 }

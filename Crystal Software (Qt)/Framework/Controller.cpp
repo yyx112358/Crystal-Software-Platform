@@ -15,12 +15,12 @@ Controller::Controller(QWidget *parent)
 	connect(ui.actionStart, &QAction::triggered, this, &Controller::slot_Start);
 	connect(ui.actionDebug, &QAction::triggered, [this]
 	{
-		auto n1 = AddNode("", ""), n2 = AddNode("", "");
-		n1->RemoveVertex(AlgVertex::VertexType::INPUT, "in");
-		n1->RemoveVertex(AlgVertex::VertexType::INPUT, "in_1");
-		n1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", n2, AlgVertex::VertexType::INPUT, "in");
-		n1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out_1", n2, AlgVertex::VertexType::INPUT, "in_1");
-
+		auto in1 = AddNode("Basic.Input", ""), in2 = AddNode("Basic.Input", ""), add1 = AddNode("", ""),
+			out1=AddNode("Basic.Output",""), out2 = AddNode("Basic.Output", "");
+		in1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", add1, AlgVertex::VertexType::INPUT, "in");
+		in2->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", add1, AlgVertex::VertexType::INPUT, "in_1");
+		add1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", out1, AlgVertex::VertexType::INPUT, "in");
+		add1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out_1", out2, AlgVertex::VertexType::INPUT, "in");
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -95,13 +95,16 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 		node->Init();
 
 		//生成GuiNode
-		if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)//优先级：guiClassname>GetGuiAdvice()>默认
+		if (guiClassname.isEmpty() == true || _factory.GetGuiNodeTbl().contains(guiClassname) == false)//优先级：guiClassname>GetGuiAdvice()>默认
 		{
+			auto oldname = guiClassname;
 			guiClassname = node->GetGuiAdvice();
 			if (_factory.GetGuiNodeTbl().contains(guiClassname) == false)
 				guiClassname = "";
+			if (oldname.isEmpty() == false)
+				GRAPH_WARNING(QString("GUI [%1] not exist!\nUse [%2]").arg(oldname).arg(guiClassname));
 		}
-		auto gui = _factory.CreateGuiNode(guiClassname, *node.get());//不会抛出异常，如果没有合适的，则生成一个基本GUI
+		QSharedPointer<GuiNode> gui = _factory.CreateGuiNode(guiClassname, node->sharedFromThis());//不会抛出异常，如果没有合适的，则生成一个基本GUI
 		node->AttachGui(gui);
 		//简单的移动，避免重叠
 		static QPointF nextLocation = QPointF(0, 0);
@@ -113,6 +116,14 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 
 		connect(gui.data(), &GuiNode::sig_SendActionToController, this, &Controller::slot_ProcessGuiAction, Qt::DirectConnection);
 		_scene.addItem(gui.get());
+
+		auto panel = gui->InitWidget(ui.scrollAreaWidgetContents_Input);
+		//TODO:分配不同种类
+		if (panel.isNull() == false) 
+		{
+			//if(gui->objectName()==)
+			ui.scrollAreaWidgetContents_Input->layout()->addWidget(panel.data());
+		}
 
 		_nodes.append(node);//放在最后，保证如果中间出现异常node可以被析构
 		return node;
@@ -146,15 +157,16 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 // 					_nodes.erase(it);
 // 					break;
 // 				}
-			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->StrongRef());
+			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->sharedFromThis());
 			break;
 		}
 		case GuiVertex::Type:
 		{
   			auto guiVtx = qgraphicsitem_cast<GuiVertex*>(item);
 			auto algVtx = guiVtx->algVertex.lock();
-			auto algNode = guiVtx->guiNode.lock()->algnode.lock();
-			algNode.constCast<AlgNode>()->RemoveVertex(algVtx->type, algVtx->objectName());
+			algVtx.constCast<AlgVertex>()->RemoveFromParent();
+// 			auto algNode = guiVtx->guiNode.lock()->algnode.lock();
+// 			algNode.constCast<AlgNode>()->RemoveVertex(algVtx->type, algVtx->objectName());
 			break;
 		}
 		default:

@@ -22,7 +22,7 @@ AlgNode::AlgNode(QThreadPool&pool, QObject*parent)
 AlgNode::~AlgNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
-	emit sig_Destroyed(_weakRef);
+	emit sig_Destroyed(sharedFromThis());
 	try
 	{
 		_resultWatcher.waitForFinished();
@@ -40,6 +40,8 @@ AlgNode::~AlgNode()
 
 void AlgNode::Init()
 {
+	if (_weakRef.isNull() == true && sharedFromThis().isNull() == false)
+		_weakRef = sharedFromThis();
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::OUTPUT, "out");
@@ -68,12 +70,12 @@ QWeakPointer<AlgVertex> AlgNode::AddVertex(AlgVertex::VertexType vertexType, QSt
 	GRAPH_ASSERT(_isUnchange == false);
 	GRAPH_ASSERT(GetVertexNames(vertexType).contains(name) == false);//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	
-	auto pv = AlgVertex::Create(WeakRef(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
+	auto pv = AlgVertex::Create(sharedFromThis(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
 	switch (vertexType)
 	{
 	case AlgVertex::VertexType::INPUT:
 		connect(pv.data(), &AlgVertex::sig_Activated, this, &AlgNode::Activate);
-		connect(this, &AlgNode::sig_ActivateFinished, pv.data(), &AlgVertex::slot_ActivateSuccess);
+		connect(this, &AlgNode::sig_ActivateFinished, pv.data(), &AlgVertex::slot_ActivateSuccess, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
 		//TODO:是否要添加自动解离？
 		break;
 	case AlgVertex::VertexType::OUTPUT:
@@ -120,7 +122,7 @@ QWeakPointer<AlgVertex> AlgNode::AddVertexAuto(AlgVertex::VertexType vertexType,
 	return pv;
 }
 
-void AlgNode::RemoveVertex(AlgVertex::VertexType vertexType, QString name)
+bool AlgNode::RemoveVertex(AlgVertex::VertexType vertexType, QString name)
 {
 	auto &vtxs = _Vertexes(vertexType);
 	for(auto i=0;i<vtxs.size();i++)
@@ -130,9 +132,10 @@ void AlgNode::RemoveVertex(AlgVertex::VertexType vertexType, QString name)
 			if (_gui.isNull() == false)
 				_gui->RemoveVertex(vtxs[i]);
 			vtxs.removeAt(i);
-			break;
+			return true;
 		}
 	}
+	return false;
 }
 
 bool AlgNode::ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName, 
@@ -145,7 +148,7 @@ bool AlgNode::ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName
 		<< dstNode->objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
 	srcVertex->Connect(dstVertex);
 	if(srcVertex->type== AlgVertex::VertexType::INPUT)
-		connect(srcVertex.data(), &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate/*, Qt::QueuedConnection*/);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
+		connect(srcVertex.data(), &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
 	else
 		connect(srcVertex.data(), &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
 	//TODO:删除连接connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, [this](AlgGraphVertex*src, AlgGraphVertex*dst)
@@ -173,7 +176,7 @@ void AlgNode::Run()
 	//TODO:加锁
 	qDebug() << objectName() << __FUNCTION__;
 	auto data = _LoadInput();
-	emit sig_ActivateFinished(WeakRef());
+	emit sig_ActivateFinished(sharedFromThis());
 	//TODO:暂停和退出
 	switch (_mode)
 	{
@@ -229,11 +232,11 @@ void AlgNode::Output()
 			Stop(true);
 		}
 	}
-	emit sig_RunFinished(WeakRef());
+	emit sig_RunFinished(sharedFromThis());
 	if (_stop == false)
 	{
 		_LoadOutput(_result);
-		emit sig_OutputFinished(WeakRef());
+		emit sig_OutputFinished(sharedFromThis());
 	}
 	_runningAmount--;
 	_isRunning = false;
@@ -254,9 +257,11 @@ QVariantHash AlgNode::_LoadInput()
 
 QVariantHash AlgNode::_Run(QVariantHash data)
 {
-// 	data["out"] = "abc";
-// 	data["out_1"] = "123";
-	return data;
+	qDebug() << objectName() << data;
+	QVariantHash result;
+	result["out"] = data["in"];
+	result["out_1"] = data["in_1"];
+	return result;
 }
 
 void AlgNode::_LoadOutput(QVariantHash result)

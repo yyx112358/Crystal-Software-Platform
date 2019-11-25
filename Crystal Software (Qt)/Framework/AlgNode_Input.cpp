@@ -1,12 +1,11 @@
 #include "stdafx.h"
 #include "AlgNode_Input.h"
-
-
+#include "GuiNode_Input.h"
 
 AlgNode_Input::AlgNode_Input(QThreadPool&pool /*= *QThreadPool::globalInstance()*/, QObject*parent /*= nullptr*/)
 	: AlgNode(pool, parent)
 {
-
+	_mode = RunMode::Direct;
 }
 
 void AlgNode_Input::Init()
@@ -15,11 +14,9 @@ void AlgNode_Input::Init()
 }
 QVariantHash AlgNode_Input::_Run(QVariantHash data)
 {
-	throw std::logic_error("The method or operation is not implemented.");
-}
-
-AlgNode_Input::~AlgNode_Input()
-{
+	GRAPH_ASSERT(_gui.isNull() == false);
+	data["out"] = _gui->GetData();
+	return data;
 }
 
 

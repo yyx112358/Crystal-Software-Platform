@@ -10,19 +10,20 @@ class AlgVertex;
 class GuiVertex;
 
 class GuiNode :
-	public QGraphicsObject
+	public QGraphicsObject,public QEnableSharedFromThis<GuiNode>
 {
 	Q_OBJECT
+	Q_DISABLE_COPY(GuiNode)
 public:
 	struct FactoryInfo
 	{
 		QString key;//用于唯一标识的key
 		QString title;//显示用的标题
 		QString description;//描述
-		std::function<QSharedPointer<GuiNode>(AlgNode&)>defaultConstructor;//默认构造函数
+		std::function<QSharedPointer<GuiNode>(QSharedPointer<AlgNode>)>defaultConstructor;//默认构造函数
 
 		FactoryInfo() {}
-		FactoryInfo(QString key, std::function<QSharedPointer<GuiNode>(AlgNode&)>defaultConstructor, QString description = QString())
+		FactoryInfo(QString key, std::function<QSharedPointer<GuiNode>(QSharedPointer<AlgNode>)>defaultConstructor, QString description = QString())
 			:key(key), title(key), description(description), defaultConstructor(defaultConstructor)
 		{}
 	};
@@ -32,25 +33,33 @@ public:
 	friend class Interface_Factory;
 	friend class QSharedPointer<GuiNode>;
 
+	bool RemoveFromParent();
 	virtual ~GuiNode();
 
 	virtual void InitApperance(QPointF center);//根据调用时候的状态生成（全量更新）
 	virtual QWeakPointer<GuiVertex>AddVertex(QSharedPointer<AlgVertex>vtx);//添加（增量更新）
 	virtual void RemoveVertex(QSharedPointer<const AlgVertex>vtx);
-	virtual QSharedPointer<QWidget> InitWidget(QWidget*parent) { GRAPH_NOT_IMPLEMENT; }
+	virtual QSharedPointer<QWidget> InitWidget(QWidget*parent) { return nullptr; }
+
+	virtual QVariant GetData() { GRAPH_NOT_IMPLEMENT; }
+	virtual void SetData(QVariant data) { GRAPH_NOT_IMPLEMENT; }
 
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 	virtual void update();//
 	virtual void refresh(){}
 
-	QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
+	//QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
 	static size_t GetAmount() { return _amount; }
 	const QWeakPointer<const AlgNode> algnode;//对应的AlgNode
+	QWeakPointer<GuiNode>WeakRef() { return _weakRef; }
+	QWeakPointer<const GuiNode>WeakRef()const { return _weakRef; }
 signals:
 	void sig_SendActionToAlg(QString action, bool isChecked);
-	void sig_SendActionToController(QWeakPointer<GuiNode>wp, QString action, bool isChecked);
+	void sig_SendActionToController(QSharedPointer<GuiNode>node, QString action, bool isChecked);
 protected:
+	GuiNode(QSharedPointer<AlgNode>parent);
+
  	QList<QSharedPointer<GuiVertex>>&_Vertexes(AlgVertex::VertexType type);
  	const QList<QSharedPointer<GuiVertex>>&_Vertexes(AlgVertex::VertexType type)const;
 	void _SortVertexesByName(AlgVertex::VertexType type);
@@ -63,8 +72,7 @@ protected:
 	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 private:
-	GuiNode(AlgNode&parent);
-	void SetWeakRef(QWeakPointer<GuiNode>wp) { _weakRef = wp; }
+	//void SetWeakRef(QWeakPointer<GuiNode>wp) { _weakRef = wp; }
 	QWeakPointer<GuiNode>_weakRef;//自身的weakRef，用于
 
 	static std::atomic_uint64_t _amount;//类实例总数

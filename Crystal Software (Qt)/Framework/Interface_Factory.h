@@ -15,8 +15,8 @@ public:
 	{
 		if (_algNodeTbl.contains(classname) == true) 
 		{
-			auto node = _algNodeTbl.value(classname).defaultConstructor();
-			node->SetWeakRef(node);
+			auto node=_algNodeTbl.value(classname).defaultConstructor();
+			node->_weakRef = node;
 			return node;
 		}
 		else
@@ -25,12 +25,12 @@ public:
 
 	virtual const QHash<QString, GuiNode::FactoryInfo>& GetGuiNodeTbl()const { return _guiNodeTbl; }
 	QStringList GetGuiNodeNames() { return _guiNodeTbl.keys(); }
-	QSharedPointer<GuiNode> CreateGuiNode(QString classname,AlgNode&algnode)
+	QSharedPointer<GuiNode> CreateGuiNode(QString classname, QSharedPointer<AlgNode>algnode)
 	{
 		if (_guiNodeTbl.contains(classname) == true) 
 		{
-			auto node = _guiNodeTbl.value(classname).defaultConstructor(algnode);
-			node->SetWeakRef(node);
+			auto node= _guiNodeTbl.value(classname).defaultConstructor(algnode);
+			node->_weakRef = node;
 			return node;
 		}
 		else

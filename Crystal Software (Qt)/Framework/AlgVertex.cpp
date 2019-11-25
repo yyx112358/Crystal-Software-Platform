@@ -9,6 +9,8 @@ AlgVertex::AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name,
 	_behaviorBefore(beforeBehavior),_behaviorAfter(afterBehavior), _defaultData(defaultData)
 {
 	_amount++;
+	if (sharedFromThis().isNull() == false)
+		_weakRef = sharedFromThis();
 #ifdef _DEBUG
 	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugname = str; });
 #endif // _DEBUG
@@ -21,9 +23,17 @@ QSharedPointer<AlgVertex> AlgVertex::Create(QWeakPointer<AlgNode>parent, VertexT
 	Behavior_NoData defaultState, Behavior_BeforeActivate beforeBehavior,
 	Behavior_AfterActivate afterBehavior, QVariant defaultData /*= QVariant()*/)
 {
-	auto pvtx = QSharedPointer<AlgVertex>::create(parent, type, name, defaultState, beforeBehavior, afterBehavior, defaultData);
-	pvtx->SetWeakRef(pvtx);
-	return pvtx;
+ 	auto pvtx = QSharedPointer<AlgVertex>::create(parent, type, name, defaultState, beforeBehavior, afterBehavior, defaultData);
+	pvtx->_weakRef = pvtx;
+ 	return pvtx;
+}
+
+bool AlgVertex::RemoveFromParent()
+{
+	if (_node.isNull() == false)
+		return _node.lock()->RemoveVertex(type, objectName());
+	else 
+		return false;
 }
 
 AlgVertex::~AlgVertex()
@@ -32,6 +42,7 @@ AlgVertex::~AlgVertex()
 	try
 	{
 		Clear();
+		RemoveFromParent();
 	}
 	catch (...)//如果无法避免Release()抛出异常，至少要无条件吞掉异常
 	{
@@ -100,25 +111,33 @@ void AlgVertex::Connect(QSharedPointer<AlgVertex>dstVertex)
 	_nextVertexes.append(dstVertex->WeakRef());
 	dstVertex->_prevVertexes.append(WeakRef());
 
-	emit sig_ConnectionAdded(WeakRef(), dstVertex);
+	emit sig_ConnectionAdded(sharedFromThis(), dstVertex);
 }
 
-void AlgVertex::Disconnect(QSharedPointer<AlgVertex>another)
+void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
 {
-	if (_nextVertexes.removeAll(another) > 0)
+	if (_nextVertexes.removeAll(another) > 0)//自身是起点
 	{
-		another->_prevVertexes.removeAll(WeakRef());
-		qDebug() << objectName() + '-' + another->objectName() << __FUNCTION__;
-		disconnect(this, &AlgVertex::sig_Activated, another.data(), &AlgVertex::Activate);
-		emit sig_ConnectionRemoved(WeakRef(), another);
+		if (another.isNull() == false) 
+		{
+			QSharedPointer<AlgVertex>spanother = another.lock();
+			spanother->_prevVertexes.removeAll(WeakRef());//这里不能用shareFromThis(),因为析构时候因为sharepointer已经消失，将返回nullptr
+			qDebug() << objectName() + '-' + spanother->objectName() << __FUNCTION__;
+			disconnect(this, &AlgVertex::sig_Activated, spanother.data(), &AlgVertex::Activate);
+			emit sig_ConnectionRemoved(WeakRef(), another);
+		}
 	}
-	else if (_prevVertexes.removeAll(another) > 0) 
+	else if (_prevVertexes.removeAll(another) > 0) //自身是终点
 	{
-		//another->Disconnect(WeakRef().lock());//不能这么用，因为析构时候已被删除
-		another->_nextVertexes.removeAll(WeakRef());
-		qDebug() << another->objectName() + '-' + objectName() << __FUNCTION__;
-		disconnect(another.data(), &AlgVertex::sig_Activated, this, &AlgVertex::Activate);
-		emit another->sig_ConnectionRemoved(WeakRef(), another);
+		if (another.isNull() == false) 
+		{
+			//another->Disconnect(WeakRef().lock());//不能这么用，因为析构时候已被删除
+			QSharedPointer<AlgVertex>spanother = another.lock();
+			spanother->_nextVertexes.removeAll(WeakRef());
+			qDebug() << spanother->objectName() + '-' + objectName() << __FUNCTION__;
+			disconnect(spanother.data(), &AlgVertex::sig_Activated, this, &AlgVertex::Activate);
+			emit spanother->sig_ConnectionRemoved(another, WeakRef());
+		}
 	}
 }
 

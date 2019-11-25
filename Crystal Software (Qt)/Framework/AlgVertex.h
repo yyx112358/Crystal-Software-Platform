@@ -10,10 +10,10 @@ class GuiVertex;
 
 const size_t AlgVertex_MaxBufferSize = 256;
 
-class AlgVertex : public QObject
+class AlgVertex : public QObject,public QEnableSharedFromThis<AlgVertex>
 {
 	Q_OBJECT
-
+	Q_DISABLE_COPY(AlgVertex)
 public:
 	enum class VertexType :unsigned char
 	{
@@ -23,11 +23,6 @@ public:
 		//TRIGGER,//触发
 	};
 	friend QDebug& operator<<(QDebug&qd, VertexType vt) { qd << ((vt == AlgVertex::VertexType::INPUT) ? "INPUT" : "OUTPUT");	return qd; }
-// 	enum class Behavior_DefaultActivateState :unsigned char//默认激活状态
-// 	{
-// 		DEFAULT_ACTIVATE,
-// 		DEFAULT_NOT_ACTIVATE,
-// 	};
 	enum class Behavior_NoData :unsigned char//决定当无数据时GetData()的返回值
 	{
 		USE_NULL,
@@ -46,12 +41,12 @@ public:
 		KEEP,//激活后保持数据
 		RESET,//激活后清除数据
 	};
-	friend class AlgNode;
 	friend class QSharedPointer<AlgVertex>;
 
 
 	static QSharedPointer<AlgVertex>Create(QWeakPointer<AlgNode>parent, VertexType type, QString name, Behavior_NoData defaultState,
 		Behavior_BeforeActivate beforeBehavior, Behavior_AfterActivate afterBehavior, QVariant defaultData = QVariant());
+	bool RemoveFromParent();
 	~AlgVertex();
 
 
@@ -60,7 +55,7 @@ public:
 	void slot_ActivateSuccess();//成功激活之后的后处理（通常，INPUT由NODE的sig_ActivateFinished()调用，OUTPUT由自身的sig_ActivateEnd()调用）
 	//连接两个节点，方向this=>dstVertex，主要是修改nextVertexes和dstVertex->prevVertexes并连接this=>dstVertex的激活信号
 	void Connect(QSharedPointer<AlgVertex>dstVertex);
-	void Disconnect(QSharedPointer<AlgVertex>another);
+	void Disconnect(QWeakPointer<AlgVertex>another);
 	
 	void Reset();//重置，主要是清除运行时状态，准备好全图的下一次运行（图运行后会改变的，主要是数据及激活位）
 	void Clear();//清除，清除运行时状态和动态状态（指调节图时候可变的，主要是使能位isEnabled和连接节点）	
@@ -80,7 +75,9 @@ public:
 
 	void AttachGui(QSharedPointer<GuiVertex>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
 	QWeakPointer<GuiVertex>GetGui()const { return _gui; }
-	QWeakPointer<AlgVertex>WeakRef()const { return _weakRef; }
+	//QSharedPointer<AlgVertex>StrongRef()const { return sharedFromThis(); }
+	QWeakPointer<AlgVertex>WeakRef() { return _weakRef; }
+	QWeakPointer<const AlgVertex>WeakRef()const { return _weakRef; }
 
 	static size_t GetAmount() { return _amount; }
 	const VertexType type;
@@ -91,7 +88,7 @@ signals:
 	void sig_ActivateEnd();//激活结束【不一定激活成功】
 
 	void sig_ConnectionAdded(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst);//连接建立成功
-	void sig_ConnectionRemoved(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst);//连接移除成功
+	void sig_ConnectionRemoved(QWeakPointer<const AlgVertex>src, QWeakPointer<const AlgVertex>dst);//连接移除成功
 
 	void sig_Destroyed(QWeakPointer<AlgNode>node, QWeakPointer<AlgVertex>vertex);//删除成功
 protected:
@@ -101,7 +98,7 @@ protected:
 	QVariant _lastdata;
 	QQueue<QVariant>_qdata;//数据队列，保证Activate()信号不丢失
 	QVariant _defaultData;//默认数据
-	QVariantMap additionInfo;//附加信息
+	QVariantMap _additionInfo;//附加信息
 	QList<std::function<bool(/*const AlgVertex*const, */const QVariant&)>>inputAssertFunctions;//输入校验。为true才会激活//TODO:后面可能会改成带名字和std::function的自定义类
 	QList<std::function<bool(/*const AlgVertex*const, */const QSharedPointer<const AlgVertex>)>> connectAssertFunctions;//连接校验
 
@@ -116,13 +113,12 @@ protected:
 	Behavior_NoData _behaviorNoData;
 
 	QWeakPointer<AlgNode>_node;//从属的节点
-	QWeakPointer<GuiVertex>_gui;
+	mutable QWeakPointer<GuiVertex>_gui;//对应的GUI
 private:
 #ifdef _DEBUG
 	QString __debugname;//调试用的，方便看名字
 #endif // _DEBUG	
-	void SetWeakRef(QWeakPointer<AlgVertex>wp) { GRAPH_ASSERT(_weakRef.isNull() == true); _weakRef = wp; }
-	QWeakPointer<AlgVertex>_weakRef;//自身的weakRef，用于代替this传递自身指针
+ 	QWeakPointer<AlgVertex>_weakRef;//自身的weakRef，用于代替this传递自身指针
 
 	static std::atomic_uint64_t _amount;//类实例总数
 };

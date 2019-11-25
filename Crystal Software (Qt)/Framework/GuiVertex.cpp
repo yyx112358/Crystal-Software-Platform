@@ -2,13 +2,20 @@
 #include "GuiVertex.h"
 #include "GuiNode.h"
 
-GuiVertex::GuiVertex(QWeakPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode)
+GuiVertex::GuiVertex(QSharedPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode)
 	:QGraphicsObject(const_cast<GuiNode*>(gnode.data())), algVertex(vtx), guiNode(gnode)
 {
 	++_amount;
-	setObjectName(vtx.lock()->objectName());
+	setObjectName(vtx->objectName());
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsScenePositionChanges);
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
+}
+
+QSharedPointer<GuiVertex> GuiVertex::Create(QSharedPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode)
+{
+	auto pvtx = QSharedPointer<GuiVertex>::create(vtx, gnode);
+	pvtx->_weakRef = pvtx;
+	return pvtx;
 }
 
 GuiVertex::~GuiVertex()

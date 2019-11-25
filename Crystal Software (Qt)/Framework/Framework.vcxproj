@@ -104,6 +104,7 @@
   <ItemGroup>
     <ClCompile Include="AlgNode.cpp" />
     <ClCompile Include="AlgNode_Input.cpp" />
+    <ClCompile Include="AlgNode_Output.cpp" />
     <ClCompile Include="AlgVertex.cpp" />
     <ClCompile Include="Controller.cpp" />
     <ClCompile Include="entry.cpp" />
@@ -111,6 +112,8 @@
     <ClCompile Include="GraphScene.cpp" />
     <ClCompile Include="GuiConnection.cpp" />
     <ClCompile Include="GuiNode.cpp" />
+    <ClCompile Include="GuiNode_Input.cpp" />
+    <ClCompile Include="GuiNode_Output.cpp" />
     <ClCompile Include="GuiVertex.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -122,6 +125,7 @@
     <QtMoc Include="AlgVertex.h" />
     <QtMoc Include="AlgNode.h" />
     <QtMoc Include="AlgNode_Input.h" />
+    <QtMoc Include="AlgNode_Output.h" />
     <ClInclude Include="entry.h" />
     <QtMoc Include="Factory_Basic.h" />
     <ClInclude Include="global.h" />
@@ -129,6 +133,8 @@
     <QtMoc Include="GraphScene.h" />
     <ClInclude Include="GuiConnection.h" />
     <QtMoc Include="GuiNode.h" />
+    <QtMoc Include="GuiNode_Input.h" />
+    <QtMoc Include="GuiNode_Output.h" />
     <ClInclude Include="GuiVertex.h" />
     <ClInclude Include="Interface_Factory.h" />
     <ClInclude Include="stdafx.h" />
