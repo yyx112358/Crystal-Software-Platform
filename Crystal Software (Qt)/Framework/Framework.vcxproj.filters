@@ -112,6 +112,9 @@
     <ClInclude Include="GuiConnection.h">
       <Filter>Viewer</Filter>
     </ClInclude>
+    <ClInclude Include="GraphSharedClass.h">
+      <Filter>_Global_</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="Controller.h">

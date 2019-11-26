@@ -9,8 +9,7 @@ AlgVertex::AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name,
 	_behaviorBefore(beforeBehavior),_behaviorAfter(afterBehavior), _defaultData(defaultData)
 {
 	_amount++;
-	if (sharedFromThis().isNull() == false)
-		_weakRef = sharedFromThis();
+	SetSelfPointer();
 #ifdef _DEBUG
 	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugname = str; });
 #endif // _DEBUG
@@ -111,7 +110,7 @@ void AlgVertex::Connect(QSharedPointer<AlgVertex>dstVertex)
 	_nextVertexes.append(dstVertex->WeakRef());
 	dstVertex->_prevVertexes.append(WeakRef());
 
-	emit sig_ConnectionAdded(sharedFromThis(), dstVertex);
+	emit sig_ConnectionAdded(StrongRef(), dstVertex);
 }
 
 void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)

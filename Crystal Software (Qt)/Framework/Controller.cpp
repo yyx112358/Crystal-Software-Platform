@@ -104,7 +104,7 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 			if (oldname.isEmpty() == false)
 				GRAPH_WARNING(QString("GUI [%1] not exist!\nUse [%2]").arg(oldname).arg(guiClassname));
 		}
-		QSharedPointer<GuiNode> gui = _factory.CreateGuiNode(guiClassname, node->sharedFromThis());//不会抛出异常，如果没有合适的，则生成一个基本GUI
+		QSharedPointer<GuiNode> gui = _factory.CreateGuiNode(guiClassname, node->StrongRef());//不会抛出异常，如果没有合适的，则生成一个基本GUI
 		node->AttachGui(gui);
 		//简单的移动，避免重叠
 		static QPointF nextLocation = QPointF(0, 0);
@@ -157,7 +157,7 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 // 					_nodes.erase(it);
 // 					break;
 // 				}
-			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->sharedFromThis());
+			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->StrongRef());
 			break;
 		}
 		case GuiVertex::Type:

@@ -32,8 +32,7 @@ GuiNode::~GuiNode()
 
 void GuiNode::InitApperance(QPointF center)
 {
-	if (_weakRef.isNull() == true && sharedFromThis().isNull() == false)
-		_weakRef = sharedFromThis(); 
+	SetSelfPointer();
 	_inputVertex.clear();
 	_outputVertex.clear();
 
@@ -48,7 +47,7 @@ void GuiNode::InitApperance(QPointF center)
 
 QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
-	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, sharedFromThis());
+	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, StrongRef());
 	vtx->AttachGui(gvtx);
 	_Vertexes(vtx->type).append(gvtx);
 	return gvtx;
@@ -110,7 +109,7 @@ void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 			}
 		}
 		else if (ctrler.contains(result))
-			emit sig_SendActionToController(sharedFromThis(), result->text(),result->isChecked());
+			emit sig_SendActionToController(StrongRef(), result->text(),result->isChecked());
 		else if (alg.contains(result))
 			emit sig_SendActionToAlg(result->text(),result->isChecked());
 	}

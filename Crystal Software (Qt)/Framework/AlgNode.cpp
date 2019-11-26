@@ -22,7 +22,7 @@ AlgNode::AlgNode(QThreadPool&pool, QObject*parent)
 AlgNode::~AlgNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
-	emit sig_Destroyed(sharedFromThis());
+	emit sig_Destroyed(WeakRef());
 	try
 	{
 		_resultWatcher.waitForFinished();
@@ -40,8 +40,7 @@ AlgNode::~AlgNode()
 
 void AlgNode::Init()
 {
-	if (_weakRef.isNull() == true && sharedFromThis().isNull() == false)
-		_weakRef = sharedFromThis();
+	SetSelfPointer();
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::OUTPUT, "out");
@@ -70,7 +69,7 @@ QWeakPointer<AlgVertex> AlgNode::AddVertex(AlgVertex::VertexType vertexType, QSt
 	GRAPH_ASSERT(_isUnchange == false);
 	GRAPH_ASSERT(GetVertexNames(vertexType).contains(name) == false);//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	
-	auto pv = AlgVertex::Create(sharedFromThis(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
+	auto pv = AlgVertex::Create(StrongRef(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
 	switch (vertexType)
 	{
 	case AlgVertex::VertexType::INPUT:
@@ -176,7 +175,7 @@ void AlgNode::Run()
 	//TODO:加锁
 	qDebug() << objectName() << __FUNCTION__;
 	auto data = _LoadInput();
-	emit sig_ActivateFinished(sharedFromThis());
+	emit sig_ActivateFinished(StrongRef());
 	//TODO:暂停和退出
 	switch (_mode)
 	{
@@ -232,11 +231,11 @@ void AlgNode::Output()
 			Stop(true);
 		}
 	}
-	emit sig_RunFinished(sharedFromThis());
+	emit sig_RunFinished(StrongRef());
 	if (_stop == false)
 	{
 		_LoadOutput(_result);
-		emit sig_OutputFinished(sharedFromThis());
+		emit sig_OutputFinished(StrongRef());
 	}
 	_runningAmount--;
 	_isRunning = false;

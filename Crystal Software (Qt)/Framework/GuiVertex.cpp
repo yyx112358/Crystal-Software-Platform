@@ -14,7 +14,7 @@ GuiVertex::GuiVertex(QSharedPointer<const AlgVertex>vtx, QWeakPointer<const GuiN
 QSharedPointer<GuiVertex> GuiVertex::Create(QSharedPointer<const AlgVertex>vtx, QWeakPointer<const GuiNode>gnode)
 {
 	auto pvtx = QSharedPointer<GuiVertex>::create(vtx, gnode);
-	pvtx->_weakRef = pvtx;
+	pvtx->SetSelfPointer();
 	return pvtx;
 }
 

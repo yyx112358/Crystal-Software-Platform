@@ -2,7 +2,7 @@
 #include "global.h"
 #include "qgraphicsitem.h"
 #include <atomic>
-//#include "AlgNode.h"
+#include "GraphSharedClass.h"
 #include "GuiVertex.h"
 
 class AlgNode;
@@ -10,10 +10,11 @@ class AlgVertex;
 class GuiVertex;
 
 class GuiNode :
-	public QGraphicsObject,public QEnableSharedFromThis<GuiNode>
+	public QGraphicsObject, protected QEnableSharedFromThis<GuiNode>
 {
 	Q_OBJECT
 	Q_DISABLE_COPY(GuiNode)
+	GRAPH_ENABLE_SHARED(GuiNode)
 public:
 	struct FactoryInfo
 	{
@@ -29,9 +30,6 @@ public:
 	};
 	enum { Type = GuiType_Node };
 	virtual int type()const { return Type; }
-
-	friend class Interface_Factory;
-	friend class QSharedPointer<GuiNode>;
 
 	bool RemoveFromParent();
 	virtual ~GuiNode();
@@ -52,8 +50,6 @@ public:
 	//QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
 	static size_t GetAmount() { return _amount; }
 	const QWeakPointer<const AlgNode> algnode;//对应的AlgNode
-	QWeakPointer<GuiNode>WeakRef() { return _weakRef; }
-	QWeakPointer<const GuiNode>WeakRef()const { return _weakRef; }
 signals:
 	void sig_SendActionToAlg(QString action, bool isChecked);
 	void sig_SendActionToController(QSharedPointer<GuiNode>node, QString action, bool isChecked);
@@ -72,9 +68,6 @@ protected:
 	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 private:
-	//void SetWeakRef(QWeakPointer<GuiNode>wp) { _weakRef = wp; }
-	QWeakPointer<GuiNode>_weakRef;//自身的weakRef，用于
-
 	static std::atomic_uint64_t _amount;//类实例总数
 };
 

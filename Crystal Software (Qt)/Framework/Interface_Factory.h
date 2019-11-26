@@ -16,7 +16,7 @@ public:
 		if (_algNodeTbl.contains(classname) == true) 
 		{
 			auto node=_algNodeTbl.value(classname).defaultConstructor();
-			node->_weakRef = node;
+			node->SetSelfPointer();
 			return node;
 		}
 		else
@@ -30,7 +30,7 @@ public:
 		if (_guiNodeTbl.contains(classname) == true) 
 		{
 			auto node= _guiNodeTbl.value(classname).defaultConstructor(algnode);
-			node->_weakRef = node;
+			node->SetSelfPointer();
 			return node;
 		}
 		else

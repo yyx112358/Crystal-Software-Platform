@@ -1,6 +1,7 @@
 #pragma once
 #include "global.h"
 #include "GraphError.h"
+#include "GraphSharedClass.h"
 #include <QObject>
 #include <QVariant>
 #include <atomic>
@@ -10,10 +11,11 @@ class GuiVertex;
 
 const size_t AlgVertex_MaxBufferSize = 256;
 
-class AlgVertex : public QObject,public QEnableSharedFromThis<AlgVertex>
+class AlgVertex : public QObject, private QEnableSharedFromThis<AlgVertex>
 {
 	Q_OBJECT
 	Q_DISABLE_COPY(AlgVertex)
+	GRAPH_ENABLE_SHARED(AlgVertex)
 public:
 	enum class VertexType :unsigned char
 	{
@@ -41,7 +43,6 @@ public:
 		KEEP,//激活后保持数据
 		RESET,//激活后清除数据
 	};
-	friend class QSharedPointer<AlgVertex>;
 
 
 	static QSharedPointer<AlgVertex>Create(QWeakPointer<AlgNode>parent, VertexType type, QString name, Behavior_NoData defaultState,
@@ -70,14 +71,9 @@ public:
 	void SetBehaviorAfter(AlgVertex::Behavior_AfterActivate val) { _behaviorAfter = val; }
 	AlgVertex::Behavior_BeforeActivate GetBehaviorBefore() const { return _behaviorBefore; }
 	void SetBehaviorBefore(AlgVertex::Behavior_BeforeActivate val) { _behaviorBefore = val; }
-// 	AlgVertex::Behavior_DefaultActivateState GetBehaviorDefault() const { return _behaviorDefault; }
-// 	void SetBehaviorDefault(AlgVertex::Behavior_DefaultActivateState val) { _behaviorDefault = val; }
 
 	void AttachGui(QSharedPointer<GuiVertex>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
 	QWeakPointer<GuiVertex>GetGui()const { return _gui; }
-	//QSharedPointer<AlgVertex>StrongRef()const { return sharedFromThis(); }
-	QWeakPointer<AlgVertex>WeakRef() { return _weakRef; }
-	QWeakPointer<const AlgVertex>WeakRef()const { return _weakRef; }
 
 	static size_t GetAmount() { return _amount; }
 	const VertexType type;
@@ -118,7 +114,6 @@ private:
 #ifdef _DEBUG
 	QString __debugname;//调试用的，方便看名字
 #endif // _DEBUG	
- 	QWeakPointer<AlgVertex>_weakRef;//自身的weakRef，用于代替this传递自身指针
 
 	static std::atomic_uint64_t _amount;//类实例总数
 };

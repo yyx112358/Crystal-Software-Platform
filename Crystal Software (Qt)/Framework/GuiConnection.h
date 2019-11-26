@@ -1,8 +1,11 @@
 #pragma once
 #include "qgraphicsitem.h"
+#include "GraphSharedClass.h"
+
 class GuiConnection :
-	public QGraphicsObject
+	public QGraphicsObject,private QEnableSharedFromThis<GuiConnection>
 {
+	GRAPH_ENABLE_SHARED(GuiConnection)
 public:
 	GuiConnection();
 	virtual ~GuiConnection();

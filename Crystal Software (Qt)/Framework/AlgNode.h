@@ -3,16 +3,18 @@
 #include "AlgVertex.h"
 
 #include "GraphError.h"
+#include "GraphSharedClass.h"
 #include <functional>
 #include <atomic>
 
 class GuiNode;
 
 class AlgNode
-	:public QObject,public QEnableSharedFromThis<AlgNode>
+	:public QObject, protected QEnableSharedFromThis<AlgNode>
 {
 	Q_OBJECT
 	Q_DISABLE_COPY(AlgNode)
+	GRAPH_ENABLE_SHARED(AlgNode)
 public:
 	enum class RunMode :unsigned char
 	{
@@ -45,8 +47,6 @@ public:
 		FactoryInfo(QString key,QString title, std::function<QSharedPointer<AlgNode>()>defaultConstructor, QString description = "")
 			:key(key), title(title), description(description), defaultConstructor(defaultConstructor) {}
 	};
-	friend class Interface_Factory;
-	friend class QSharedPointer<AlgNode>;
 
 	virtual ~AlgNode();
 	virtual QSharedPointer<AlgNode>Clone()const { GRAPH_NOT_IMPLEMENT; }
@@ -79,10 +79,6 @@ public:
 	QStringList GetVertexNames(AlgVertex::VertexType type)const;
 	QList<QSharedPointer<const AlgVertex>> GetVertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<const AlgVertex>GetOneVertex(AlgVertex::VertexType type, QString name)const { return _FindVertex(type, name); }
-	//virtual QSharedPointer<const AlgNode>StrongRef() { return sharedFromThis(); }
-	//virtual QSharedPointer<const AlgNode>StrongRef()const { return sharedFromThis(); }
-	QWeakPointer<AlgNode>WeakRef() { return _weakRef; }
-	QWeakPointer<const AlgNode>WeakRef()const { return _weakRef; }
 
 	static size_t GetAmount() { return _amount; }
 	static size_t GetRunningAmount() { return _runningAmount; }
@@ -91,7 +87,7 @@ signals:
 	void sig_RunFinished(QSharedPointer<AlgNode>node);//运行结束
 	void sig_OutputFinished(QSharedPointer<AlgNode>node);//输出结束
 
-	void sig_Destroyed(QSharedPointer<AlgNode>wp);
+	void sig_Destroyed(QWeakPointer<AlgNode>wp);
 protected:
 
 	AlgNode(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
@@ -106,8 +102,6 @@ protected:
 
 	QList<QSharedPointer<AlgVertex>>_inputVertex;
 	QList<QSharedPointer<AlgVertex>>_outputVertex;
-// 	QHash<QString, QWeakPointer<AlgVertex>>_inputVertexSearchTbl;//用于快速查找的查找表//TODO:或许可以直接顺序查找获得，因为个数一般不多
-// 	QHash<QString, QWeakPointer<AlgVertex>>_outputVertexSearchTbl;//用于快速查找的查找表
 
 	QFutureWatcher<QVariantHash> _resultWatcher;//程序运行观测器
 	QVariantHash _result;//程序运行结果
@@ -128,8 +122,6 @@ private:
 	QString __debugname;//调试用的，方便看名字
 	time_t __RunTime;//计时用的
 #endif // _DEBUG
-	//void SetWeakRef(QWeakPointer<AlgNode>wp) { GRAPH_ASSERT(_weakRef.isNull() == true); _weakRef = wp; }
-	QWeakPointer<AlgNode>_weakRef;//自身的weakRef，用于代替this传递自身指针
 
 	static std::atomic_uint64_t _amount;//类实例总数
 	static std::atomic_uint64_t _runningAmount;
