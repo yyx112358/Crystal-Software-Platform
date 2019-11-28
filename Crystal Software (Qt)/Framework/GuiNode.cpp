@@ -7,6 +7,7 @@
 GuiNode::GuiNode(QSharedPointer<AlgNode>parent)
 	:algnode(parent)
 {
+	GRAPH_ASSERT(parent.isNull() == false);
 	++_amount;
 	auto node = algnode.lock();
 	setObjectName(node->objectName());
@@ -48,6 +49,8 @@ void GuiNode::InitApperance(QPointF center)
 QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
 	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, StrongRef());
+	connect(vtx.data(), &AlgVertex::sig_ConnectionAdded, gvtx.data(), &GuiVertex::AddConnection);
+	connect(vtx.data(), &AlgVertex::sig_ConnectionRemoved, gvtx.data(), &GuiVertex::RemoveConnection);
 	vtx->AttachGui(gvtx);
 	_Vertexes(vtx->type).append(gvtx);
 	return gvtx;

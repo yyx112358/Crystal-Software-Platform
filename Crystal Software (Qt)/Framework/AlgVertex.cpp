@@ -8,6 +8,7 @@ AlgVertex::AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name,
 	:_node(parent),type(type),_behaviorNoData(defaultState),
 	_behaviorBefore(beforeBehavior),_behaviorAfter(afterBehavior), _defaultData(defaultData)
 {
+	GRAPH_ASSERT(parent.isNull() == false);
 	_amount++;
 	SetSelfPointer();
 #ifdef _DEBUG
@@ -110,6 +111,11 @@ void AlgVertex::Connect(QSharedPointer<AlgVertex>dstVertex)
 	_nextVertexes.append(dstVertex->WeakRef());
 	dstVertex->_prevVertexes.append(WeakRef());
 
+	if (type == AlgVertex::VertexType::INPUT)
+		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
+	else
+		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
+
 	emit sig_ConnectionAdded(StrongRef(), dstVertex);
 }
 
@@ -123,7 +129,7 @@ void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
 			spanother->_prevVertexes.removeAll(WeakRef());//这里不能用shareFromThis(),因为析构时候因为sharepointer已经消失，将返回nullptr
 			qDebug() << objectName() + '-' + spanother->objectName() << __FUNCTION__;
 			disconnect(this, &AlgVertex::sig_Activated, spanother.data(), &AlgVertex::Activate);
-			emit sig_ConnectionRemoved(WeakRef(), another);
+			emit sig_ConnectionRemoved(WeakRef().data(), another.data());
 		}
 	}
 	else if (_prevVertexes.removeAll(another) > 0) //自身是终点
@@ -135,7 +141,7 @@ void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
 			spanother->_nextVertexes.removeAll(WeakRef());
 			qDebug() << spanother->objectName() + '-' + objectName() << __FUNCTION__;
 			disconnect(spanother.data(), &AlgVertex::sig_Activated, this, &AlgVertex::Activate);
-			emit spanother->sig_ConnectionRemoved(another, WeakRef());
+			emit spanother->sig_ConnectionRemoved(another.data(), WeakRef().data());
 		}
 	}
 }
@@ -148,18 +154,6 @@ void AlgVertex::Reset()
 		_lastdata = _defaultData;
 	else
 		_lastdata.clear();
-// 	switch (_behaviorDefault)
-// 	{
-// 	case AlgVertex::Behavior_DefaultActivateState::DEFAULT_ACTIVATE:
-// 		_isActivated = true;
-// 		break;
-// 	case AlgVertex::Behavior_DefaultActivateState::DEFAULT_NOT_ACTIVATE:
-// 		_isActivated = false;
-// 		break;
-// 	default:
-// 		GRAPH_NOT_IMPLEMENT;
-// 		break;
-// 	}
 }
 
 void AlgVertex::Clear()

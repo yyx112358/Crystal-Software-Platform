@@ -65,7 +65,8 @@ public:
 	virtual bool RemoveVertex(AlgVertex::VertexType vertexType, QString name);//删除Vertex
 	virtual bool ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName,
 		QSharedPointer<AlgNode>dstNode, AlgVertex::VertexType dstVertexType, QString dstVertexName);
-	virtual void DisconnectVertex(AlgVertex::VertexType vertexType, QString vertexName) { GRAPH_NOT_IMPLEMENT; }
+	virtual void DisconnectVertex(AlgVertex::VertexType vertexType, QString vertexName,
+		QSharedPointer<AlgNode>dstNode, AlgVertex::VertexType dstVertexType, QString dstVertexName);
 
 	void Activate();
 	void Run();
@@ -74,6 +75,8 @@ public:
 	void Stop(bool isStop) { _stop = isStop; }
 
 	void AttachGui(QSharedPointer<GuiNode>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
+	QSharedPointer<GuiNode>GetGui() { return _gui; }
+	QSharedPointer<const GuiNode>GetGui()const { return _gui; }
 	virtual QString GetGuiAdvice()const { return QString(); }
 
 	QStringList GetVertexNames(AlgVertex::VertexType type)const;
@@ -87,7 +90,7 @@ signals:
 	void sig_RunFinished(QSharedPointer<AlgNode>node);//运行结束
 	void sig_OutputFinished(QSharedPointer<AlgNode>node);//输出结束
 
-	void sig_Destroyed(QWeakPointer<AlgNode>wp);
+	void sig_Destroyed(QWeakPointer<AlgNode>wp);//删除信号
 protected:
 
 	AlgNode(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造

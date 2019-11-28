@@ -5,10 +5,10 @@
 #define GRAPH_ENABLE_SHARED(Tp) \
 public:\
 	friend class QSharedPointer<Tp>;\
-	inline QSharedPointer<Tp>StrongRef() { return _weakRef.lock(); }\
-	inline QSharedPointer<const Tp>StrongRef()const { return _weakRef.lock(); }\
+	inline QSharedPointer<Tp>StrongRef() { return sharedFromThis(); }\
+	inline QSharedPointer<const Tp>StrongRef()const { return sharedFromThis(); }\
 	inline QWeakPointer<Tp>WeakRef() { return _weakRef; }\
 	inline QWeakPointer<const Tp>WeakRef()const { return _weakRef; }\
-	void SetSelfPointer() { if (sharedFromThis().isNull() == false)  _weakRef = sharedFromThis(); }\
+	void SetSelfPointer() { if (sharedFromThis().isNull() == false) _weakRef = sharedFromThis(); }\
 private:\
-	mutable QWeakPointer<Tp>_weakRef;//自身的weakRef，用于代替this传递自身指针
+	mutable QWeakPointer<Tp>_weakRef;/*自身的weakRef，用于代替this传递自身指针*/

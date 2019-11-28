@@ -2,9 +2,12 @@
 #include "global.h"
 #include <QMainWindow>
 #include "ui_Controller.h"
-#include "AlgNode.h"
+//#include "AlgNode.h"
 #include "GraphScene.h"
 #include "Factory_Basic.h"
+
+class AlgNode;
+class AlgVertex;
 
 class /*FRAMEWORK_EXPORT*/ Controller : public QMainWindow
 {
@@ -29,6 +32,7 @@ private:
 	QList<QWeakPointer<AlgNode>>_resumeNodes;//TODO:用于暂停之后的重启
 
 	void slot_CreateNodeByButton();
+	void slot_AddConnection(QSharedPointer<GuiVertex> src, QSharedPointer<GuiVertex> dst);
 	void slot_RemoveItems(QList<QGraphicsItem*>items);
 
 	void slot_Start();

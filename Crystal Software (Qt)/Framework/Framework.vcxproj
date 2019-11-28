@@ -136,7 +136,7 @@
     <QtMoc Include="GuiNode.h" />
     <QtMoc Include="GuiNode_Input.h" />
     <QtMoc Include="GuiNode_Output.h" />
-    <ClInclude Include="GuiVertex.h" />
+    <QtMoc Include="GuiVertex.h" />
     <ClInclude Include="Interface_Factory.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

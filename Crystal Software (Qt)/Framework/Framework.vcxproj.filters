@@ -106,9 +106,6 @@
     <ClInclude Include="Interface_Factory.h">
       <Filter>Controller\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GuiVertex.h">
-      <Filter>Viewer</Filter>
-    </ClInclude>
     <ClInclude Include="GuiConnection.h">
       <Filter>Viewer</Filter>
     </ClInclude>
@@ -149,6 +146,9 @@
     </QtMoc>
     <QtMoc Include="GuiNode_Output.h">
       <Filter>Viewer\Subclass Header</Filter>
+    </QtMoc>
+    <QtMoc Include="GuiVertex.h">
+      <Filter>Viewer</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>

@@ -146,13 +146,20 @@ bool AlgNode::ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName
 	qDebug() << srcVertex->objectName() + ':' + srcVertex->objectName()
 		<< dstNode->objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
 	srcVertex->Connect(dstVertex);
-	if(srcVertex->type== AlgVertex::VertexType::INPUT)
-		connect(srcVertex.data(), &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
-	else
-		connect(srcVertex.data(), &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
 	//TODO:删除连接connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, [this](AlgGraphVertex*src, AlgGraphVertex*dst)
 
 	return true;
+}
+
+void AlgNode::DisconnectVertex(AlgVertex::VertexType vertexType, QString vertexName,
+	QSharedPointer<AlgNode>dstNode, AlgVertex::VertexType dstVertexType, QString dstVertexName)
+{
+	QSharedPointer<AlgVertex>srcVertex = _FindVertex(vertexType, vertexName),
+		dstVertex = dstNode->_FindVertex(dstVertexType, dstVertexName);
+	GRAPH_ASSERT(srcVertex != nullptr&&dstVertex != nullptr&&srcVertex != dstVertex);
+	qDebug() << srcVertex->objectName() + ':' + srcVertex->objectName()
+		<< dstNode->objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
+	srcVertex->Disconnect(dstVertex);
 }
 
 void AlgNode::Activate()

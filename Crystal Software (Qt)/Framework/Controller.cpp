@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include "GraphError.h"
 #include "GuiNode.h"
+#include "GuiConnection.h"
 
 Controller::Controller(QWidget *parent)
 	: QMainWindow(parent), _pool(this), _scene(this), _factory(this)
@@ -10,8 +11,12 @@ Controller::Controller(QWidget *parent)
 	//ui初始化
 	ui.setupUi(this);
 	ui.graphicsView->setScene(&_scene);
-	connect(&_scene, &GraphScene::sig_RemoveItems, this, &Controller::slot_RemoveItems, Qt::DirectConnection);
+	ui.graphicsView->setRenderHint(QPainter::RenderHint::Antialiasing, true);//抗锯齿
+	ui.graphicsView->setMouseTracking(true);
+	//ui.graphicsView->setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);//消除残影
 	//连接信号
+	connect(&_scene, &GraphScene::sig_RemoveItems, this, &Controller::slot_RemoveItems, Qt::DirectConnection);
+	connect(&_scene, &GraphScene::sig_ConnectionAdded, this, &Controller::slot_AddConnection, Qt::DirectConnection);
 	connect(ui.actionStart, &QAction::triggered, this, &Controller::slot_Start);
 	connect(ui.actionDebug, &QAction::triggered, [this]
 	{
@@ -21,6 +26,11 @@ Controller::Controller(QWidget *parent)
 		in2->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", add1, AlgVertex::VertexType::INPUT, "in_1");
 		add1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out", out1, AlgVertex::VertexType::INPUT, "in");
 		add1->ConnectVertex(AlgVertex::VertexType::OUTPUT, "out_1", out2, AlgVertex::VertexType::INPUT, "in");
+		in1->GetGui()->setPos(-150, -100);
+		in2->GetGui()->setPos(-150, 50);
+		add1->GetGui()->setPos(0, 0);
+		out1->GetGui()->setPos(150, -100);
+		out2->GetGui()->setPos(150, 50);
 // 		for (auto n : _nodes) 
 // 		{
 // 			n->dumpObjectInfo();
@@ -34,7 +44,7 @@ Controller::Controller(QWidget *parent)
 	LoadFactory();
 	//监视器
 	_monitorTimerId = startTimer(100, Qt::TimerType::CoarseTimer);
-	_refreshTimerId = startTimer(1000, Qt::TimerType::CoarseTimer);
+	_refreshTimerId = startTimer(5000, Qt::TimerType::CoarseTimer);
 	qDebug() << _factory.GetAlgNodeNames();
 }
 
@@ -141,6 +151,23 @@ void Controller::slot_CreateNodeByButton()
 	AddNode(name);
 }
 
+void Controller::slot_AddConnection(QSharedPointer<GuiVertex> src, QSharedPointer<GuiVertex> dst)
+{
+	try
+	{
+		src->algVertex.lock().constCast<AlgVertex>()->Connect(dst->algVertex.lock().constCast<AlgVertex>());
+	}
+	catch (GraphError&e)
+	{
+		QMessageBox::warning(this, e.err, e.msg);
+	}
+	catch (...)
+	{
+		QMessageBox::critical(this, "Critical", "unknown error");
+		assert(0);
+	}
+}
+
 void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 {
 	//原则上仅允许这里使用const_cast
@@ -150,13 +177,6 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 		{
 		case GuiNode::Type: 
 		{
-//			auto target = qgraphicsitem_cast<GuiNode*>(item)->algnode;
-// 			for(auto it=_nodes.begin();it!=_nodes.end();++it)
-// 				if (it->data() == target.data())
-// 				{
-// 					_nodes.erase(it);
-// 					break;
-// 				}
 			_nodes.removeAll(const_cast<AlgNode*>(qgraphicsitem_cast<GuiNode*>(item)->algnode.data())->StrongRef());
 			break;
 		}
@@ -167,6 +187,13 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 			algVtx.constCast<AlgVertex>()->RemoveFromParent();
 // 			auto algNode = guiVtx->guiNode.lock()->algnode.lock();
 // 			algNode.constCast<AlgNode>()->RemoveVertex(algVtx->type, algVtx->objectName());
+			break;
+		}
+		case GuiConnection::Type:
+		{
+			auto guiConnection = qgraphicsitem_cast<GuiConnection*>(item);
+			auto algSrcVtx = guiConnection->srcAlgVertex.lock(), algDstVtx = guiConnection->dstAlgVertex.lock();
+			algSrcVtx.constCast<AlgVertex>()->Disconnect(algDstVtx.constCast<AlgVertex>().toWeakRef());
 			break;
 		}
 		default:
@@ -222,35 +249,14 @@ void Controller::timerEvent(QTimerEvent *event)
  		ui.lcdNumber_AlgVertex->display(static_cast<int> (AlgVertex::GetAmount()));
  		ui.lcdNumber_GuiNode->display(static_cast<int> (GuiNode::GetAmount()));
  		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
-// 		ui.lcdNumber_GuiItemArrow->display(static_cast<int> (GuiGraphItemArrow::GetAmount()));
+		ui.lcdNumber_GuiConnection->display(static_cast<int>(GuiConnection::GetAmount()));
  		ui.lcdNumber->display(static_cast<int> (_nodes.size()));
 	}
 	if (event->timerId() == _refreshTimerId)
 	{
-/*
-		static int it = 0; 
-		if (it % 2 == 0)
-		{
-			for (auto i = 0; i < 50; i++)
-				AddNode("");
-		}
-		else
-			Release();
-		it++;*/
+		ui.graphicsView->scene()->update();
 	}
 }
 
-// class Base
-// {
-// public:
-// 	struct bigdata {};
-// 	QSharedDataPointer<bigdata>copydata=GetDefault();
-// private:
-// 	virtual QSharedDataPointer<bigdata>GetDefault()const
-// 	{
-// 		static QSharedDataPointer<bigdata> data;
-// 		return data;
-// 	}
-// };
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;

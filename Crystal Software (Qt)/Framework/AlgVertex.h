@@ -84,7 +84,7 @@ signals:
 	void sig_ActivateEnd();//激活结束【不一定激活成功】
 
 	void sig_ConnectionAdded(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst);//连接建立成功
-	void sig_ConnectionRemoved(QWeakPointer<const AlgVertex>src, QWeakPointer<const AlgVertex>dst);//连接移除成功
+	void sig_ConnectionRemoved(const AlgVertex*const src, const AlgVertex*const dst);//连接移除成功
 
 	void sig_Destroyed(QWeakPointer<AlgNode>node, QWeakPointer<AlgVertex>vertex);//删除成功
 protected:
