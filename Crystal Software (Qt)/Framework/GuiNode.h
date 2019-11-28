@@ -2,7 +2,6 @@
 #include "global.h"
 #include "qgraphicsitem.h"
 #include <atomic>
-#include "GraphSharedClass.h"
 #include "GuiVertex.h"
 
 class AlgNode;
@@ -10,11 +9,10 @@ class AlgVertex;
 class GuiVertex;
 
 class GuiNode :
-	public QGraphicsObject, protected QEnableSharedFromThis<GuiNode>
+	public QGraphicsObject, public QEnableSharedFromThis<GuiNode>
 {
 	Q_OBJECT
-	Q_DISABLE_COPY(GuiNode)
-	GRAPH_ENABLE_SHARED(GuiNode)
+	GRAPH_SHARED_BASE_QOBJECT(GuiNode)
 public:
 	struct FactoryInfo
 	{
@@ -48,7 +46,6 @@ public:
 	virtual void refresh(){}
 
 	//QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
-	static size_t GetAmount() { return _amount; }
 	const QWeakPointer<const AlgNode> algnode;//对应的AlgNode
 signals:
 	void sig_SendActionToAlg(QString action, bool isChecked);
@@ -68,6 +65,5 @@ protected:
 	virtual void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 private:
-	static std::atomic_uint64_t _amount;//类实例总数
 };
 

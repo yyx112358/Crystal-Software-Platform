@@ -131,7 +131,6 @@
     <ClInclude Include="global.h" />
     <QtMoc Include="GraphError.h" />
     <QtMoc Include="GraphScene.h" />
-    <ClInclude Include="GraphSharedClass.h" />
     <ClInclude Include="GuiConnection.h" />
     <QtMoc Include="GuiNode.h" />
     <QtMoc Include="GuiNode_Input.h" />

@@ -14,11 +14,7 @@ public:
 	QSharedPointer<AlgNode> CreateAlgNode(QString classname)
 	{
 		if (_algNodeTbl.contains(classname) == true) 
-		{
-			auto node=_algNodeTbl.value(classname).defaultConstructor();
-			node->SetSelfPointer();
-			return node;
-		}
+			return _algNodeTbl.value(classname).defaultConstructor();
 		else
 			throw GraphError(GraphError::NotExist, QString("[%1] Not Exist in [Factory]").arg( classname), __FUNCTION__, __FILE__, __LINE__);
 	}
@@ -28,11 +24,7 @@ public:
 	QSharedPointer<GuiNode> CreateGuiNode(QString classname, QSharedPointer<AlgNode>algnode)
 	{
 		if (_guiNodeTbl.contains(classname) == true) 
-		{
-			auto node= _guiNodeTbl.value(classname).defaultConstructor(algnode);
-			node->SetSelfPointer();
-			return node;
-		}
+			return _guiNodeTbl.value(classname).defaultConstructor(algnode);
 		else
 			throw GraphError(GraphError::NotExist, QString("[%1] Not Exist in [Factory]").arg(classname), __FUNCTION__, __FILE__, __LINE__);
 	}

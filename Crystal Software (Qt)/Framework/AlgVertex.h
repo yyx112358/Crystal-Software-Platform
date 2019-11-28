@@ -1,7 +1,6 @@
 #pragma once
 #include "global.h"
 #include "GraphError.h"
-#include "GraphSharedClass.h"
 #include <QObject>
 #include <QVariant>
 #include <atomic>
@@ -11,11 +10,10 @@ class GuiVertex;
 
 const size_t AlgVertex_MaxBufferSize = 256;
 
-class AlgVertex : public QObject, private QEnableSharedFromThis<AlgVertex>
+class AlgVertex : public QObject, public QEnableSharedFromThis<AlgVertex>
 {
 	Q_OBJECT
-	Q_DISABLE_COPY(AlgVertex)
-	GRAPH_ENABLE_SHARED(AlgVertex)
+	GRAPH_SHARED_BASE_QOBJECT(AlgVertex)
 public:
 	enum class VertexType :unsigned char
 	{
@@ -75,7 +73,6 @@ public:
 	void AttachGui(QSharedPointer<GuiVertex>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
 	QWeakPointer<GuiVertex>GetGui()const { return _gui; }
 
-	static size_t GetAmount() { return _amount; }
 	const VertexType type;
 
 signals:
@@ -111,10 +108,5 @@ protected:
 	QWeakPointer<AlgNode>_node;//从属的节点
 	mutable QWeakPointer<GuiVertex>_gui;//对应的GUI
 private:
-#ifdef _DEBUG
-	QString __debugname;//调试用的，方便看名字
-#endif // _DEBUG	
-
-	static std::atomic_uint64_t _amount;//类实例总数
 };
 

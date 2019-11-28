@@ -33,7 +33,6 @@ GuiNode::~GuiNode()
 
 void GuiNode::InitApperance(QPointF center)
 {
-	SetSelfPointer();
 	_inputVertex.clear();
 	_outputVertex.clear();
 
@@ -48,7 +47,7 @@ void GuiNode::InitApperance(QPointF center)
 
 QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
-	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, StrongRef());
+	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, sharedFromThis());
 	connect(vtx.data(), &AlgVertex::sig_ConnectionAdded, gvtx.data(), &GuiVertex::AddConnection);
 	connect(vtx.data(), &AlgVertex::sig_ConnectionRemoved, gvtx.data(), &GuiVertex::RemoveConnection);
 	vtx->AttachGui(gvtx);
@@ -112,7 +111,7 @@ void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 			}
 		}
 		else if (ctrler.contains(result))
-			emit sig_SendActionToController(StrongRef(), result->text(),result->isChecked());
+			emit sig_SendActionToController(sharedFromThis(), result->text(),result->isChecked());
 		else if (alg.contains(result))
 			emit sig_SendActionToAlg(result->text(),result->isChecked());
 	}
@@ -157,5 +156,11 @@ void GuiNode::_ArrangeLocation()
 	for (auto y = fm.height(), i = 0; i < _outputVertex.size(); y += _outputVertex[i]->boundingRect().height(), i++)
 		_outputVertex[i]->setPos(boundingRect().width() - _outputVertex[i]->boundingRect().width(), y);
 }
+
+QSharedPointer<GuiNode> GuiNode::Clone()const
+{
+	GRAPH_NOT_IMPLEMENT;
+}
+
 
 std::atomic_uint64_t GuiNode::_amount;

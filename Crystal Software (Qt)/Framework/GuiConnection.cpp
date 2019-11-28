@@ -17,11 +17,12 @@ GuiConnection::GuiConnection(QSharedPointer<const AlgVertex>src, QSharedPointer<
 
 QSharedPointer<GuiConnection> GuiConnection::Create(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst)
 {
-	auto con = QSharedPointer<GuiConnection>::create(src, dst);
-	con->SetSelfPointer();
-	return con;
+	return QSharedPointer<GuiConnection>::create(src, dst);
 }
-
+QSharedPointer<GuiConnection> GuiConnection::Clone()const
+{
+	GRAPH_NOT_IMPLEMENT;
+}
 GuiConnection::~GuiConnection()
 {
 	qDebug()<<((dstGuiVertex.isNull()==false)?(dstGuiVertex.lock()->objectName()):"")<<"-"

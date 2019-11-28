@@ -10,9 +10,8 @@ AlgVertex::AlgVertex(QWeakPointer<AlgNode>parent, VertexType type, QString name,
 {
 	GRAPH_ASSERT(parent.isNull() == false);
 	_amount++;
-	SetSelfPointer();
 #ifdef _DEBUG
-	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugname = str; });
+	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugName = str; });
 #endif // _DEBUG
 	setObjectName(name);
 	inputAssertFunctions.append([this](const QVariant&)
@@ -23,9 +22,7 @@ QSharedPointer<AlgVertex> AlgVertex::Create(QWeakPointer<AlgNode>parent, VertexT
 	Behavior_NoData defaultState, Behavior_BeforeActivate beforeBehavior,
 	Behavior_AfterActivate afterBehavior, QVariant defaultData /*= QVariant()*/)
 {
- 	auto pvtx = QSharedPointer<AlgVertex>::create(parent, type, name, defaultState, beforeBehavior, afterBehavior, defaultData);
-	pvtx->_weakRef = pvtx;
- 	return pvtx;
+ 	return QSharedPointer<AlgVertex>::create(parent, type, name, defaultState, beforeBehavior, afterBehavior, defaultData);
 }
 
 bool AlgVertex::RemoveFromParent()
@@ -105,18 +102,22 @@ void AlgVertex::slot_ActivateSuccess()
 
 void AlgVertex::Connect(QSharedPointer<AlgVertex>dstVertex)
 {
-	GRAPH_ASSERT(dstVertex.isNull() == false);
+	GRAPH_ASSERT(dstVertex.isNull() == false //非空
+		&& dstVertex!=this	//禁止自指
+		&& _nextVertexes.contains(dstVertex)==false	//禁止重复
+		&& dstVertex->_prevVertexes.contains(sharedFromThis())==false
+	);
 	for (auto &f : connectAssertFunctions)
 		GRAPH_ASSERT(f(dstVertex) == true);
-	_nextVertexes.append(dstVertex->WeakRef());
-	dstVertex->_prevVertexes.append(WeakRef());
+	_nextVertexes.append(dstVertex->sharedFromThis());
+	dstVertex->_prevVertexes.append(sharedFromThis());
 
 	if (type == AlgVertex::VertexType::INPUT)
 		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
 	else
 		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
 
-	emit sig_ConnectionAdded(StrongRef(), dstVertex);
+	emit sig_ConnectionAdded(sharedFromThis(), dstVertex);
 }
 
 void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
@@ -126,10 +127,10 @@ void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
 		if (another.isNull() == false) 
 		{
 			QSharedPointer<AlgVertex>spanother = another.lock();
-			spanother->_prevVertexes.removeAll(WeakRef());//这里不能用shareFromThis(),因为析构时候因为sharepointer已经消失，将返回nullptr
+			spanother->_prevVertexes.removeAll(sharedFromThis());//这里不能用shareFromThis(),因为析构时候因为sharepointer已经消失，将返回nullptr
 			qDebug() << objectName() + '-' + spanother->objectName() << __FUNCTION__;
 			disconnect(this, &AlgVertex::sig_Activated, spanother.data(), &AlgVertex::Activate);
-			emit sig_ConnectionRemoved(WeakRef().data(), another.data());
+			emit sig_ConnectionRemoved(sharedFromThis().data(), another.data());
 		}
 	}
 	else if (_prevVertexes.removeAll(another) > 0) //自身是终点
@@ -138,10 +139,10 @@ void AlgVertex::Disconnect(QWeakPointer<AlgVertex>another)
 		{
 			//another->Disconnect(WeakRef().lock());//不能这么用，因为析构时候已被删除
 			QSharedPointer<AlgVertex>spanother = another.lock();
-			spanother->_nextVertexes.removeAll(WeakRef());
+			spanother->_nextVertexes.removeAll(sharedFromThis());
 			qDebug() << spanother->objectName() + '-' + objectName() << __FUNCTION__;
 			disconnect(spanother.data(), &AlgVertex::sig_Activated, this, &AlgVertex::Activate);
-			emit spanother->sig_ConnectionRemoved(another.data(), WeakRef().data());
+			emit spanother->sig_ConnectionRemoved(another.data(), sharedFromThis().data());
 		}
 	}
 }
@@ -185,6 +186,11 @@ QVariant AlgVertex::GetData() const
 		GRAPH_NOT_IMPLEMENT;
 	}
 	//_qdata.size() > 0 ? _qdata.front() : _defaultData;
+}
+
+QSharedPointer<AlgVertex> AlgVertex::Clone()const
+{
+	GRAPH_NOT_IMPLEMENT;
 }
 
 std::atomic_uint64_t AlgVertex::_amount;

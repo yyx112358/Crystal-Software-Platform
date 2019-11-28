@@ -59,7 +59,7 @@ void GraphScene::mousePressEvent(QGraphicsSceneMouseEvent *event)//主要处理画线
 			auto dstItem = qgraphicsitem_cast<GuiVertex*>(itemAt(dstPos, QTransform())),
 				srcItem = qgraphicsitem_cast<GuiVertex*>(itemAt(srcPos, QTransform()));//必须先删掉arrow，否则获取的是arrow
 			if (dstItem != nullptr&&srcItem != nullptr && srcItem->type() == GuiVertex::Type)
-				emit sig_ConnectionAdded(srcItem->StrongRef(), dstItem->StrongRef());
+				emit sig_ConnectionAdded(srcItem->sharedFromThis(), dstItem->sharedFromThis());
 		}
 	}
 

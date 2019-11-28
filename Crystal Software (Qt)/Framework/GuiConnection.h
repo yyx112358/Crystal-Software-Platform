@@ -1,15 +1,14 @@
 #pragma once
 #include "qgraphicsitem.h"
-#include "GraphSharedClass.h"
 
 class AlgVertex;
 class GuiVertex;
 
 //GUI界面当中的连接线
 class GuiConnection :
-	public QGraphicsObject, private QEnableSharedFromThis<GuiConnection>
+	public QGraphicsObject, public QEnableSharedFromThis<GuiConnection>
 {
-	GRAPH_ENABLE_SHARED(GuiConnection)
+	GRAPH_SHARED_BASE_QOBJECT(GuiConnection)
 public:
 	static QSharedPointer<GuiConnection>Create(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst);//创建对象（注意dst不能为空）
 	virtual ~GuiConnection();
@@ -25,7 +24,6 @@ public:
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
-	static size_t GetAmount() { return _amount; }
 	const QWeakPointer<const AlgVertex>srcAlgVertex, dstAlgVertex;
 	const QWeakPointer<const GuiVertex>srcGuiVertex, dstGuiVertex;
 
@@ -35,7 +33,6 @@ protected:
 	QPolygonF _arrowHead;//箭头
 	//QGraphicsLineItem _lineItem;
 private:
-	static std::atomic_uint64_t _amount;//类实例总数
 	static double _arrowHeadSize;//箭头大小
 };
 

@@ -41,22 +41,20 @@ void GuiVertex::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 
 QSharedPointer<GuiVertex> GuiVertex::Create(QSharedPointer<const AlgVertex>vtx, QSharedPointer<const GuiNode>gnode)
 {
-	auto pvtx = QSharedPointer<GuiVertex>::create(vtx, gnode);
-	pvtx->SetSelfPointer();
-	return pvtx;
+	return QSharedPointer<GuiVertex>::create(vtx, gnode);
 }
 
 GuiVertex::~GuiVertex()
 {
 	qDebug() << __FUNCTION__;
-	emit sig_Destroyed(WeakRef());
+	emit sig_Destroyed(sharedFromThis());
 	_connections.clear();
 	--_amount;
 }
 
 void GuiVertex::AddConnection(QSharedPointer<const AlgVertex>src, QSharedPointer<const AlgVertex>dst)
 {
-	if (src.isNull() == false && src->GetGui() == WeakRef())
+	if (src.isNull() == false && src->GetGui() == sharedFromThis())
 	{
 		auto con = GuiConnection::Create(src, dst);
 		//connect(dst->destroyed)
@@ -135,6 +133,11 @@ void GuiVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 		painter->setPen(QPen(QColor(160, 160, 160)));
 		painter->drawRect(bbox);
 	}
+}
+
+QSharedPointer<GuiVertex> GuiVertex::Clone()const
+{
+	GRAPH_NOT_IMPLEMENT;
 }
 
 std::atomic_uint64_t GuiVertex::_amount;

@@ -14,7 +14,7 @@ AlgNode::AlgNode(QThreadPool&pool, QObject*parent)
 	qDebug() << objectName() << __FUNCTION__;
 	GRAPH_INFORM(objectName() + __FUNCTION__);
 #ifdef _DEBUG
-	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugname = str; });
+	connect(this, &AlgNode::objectNameChanged, [this](QString str) {__debugName = str; });
 #endif // _DEBUG
 	connect(&_resultWatcher, &QFutureWatcher<QVariantHash>::finished, this, &AlgNode::Output);
 }
@@ -22,7 +22,7 @@ AlgNode::AlgNode(QThreadPool&pool, QObject*parent)
 AlgNode::~AlgNode()
 {
 	qDebug() << objectName() << __FUNCTION__;
-	emit sig_Destroyed(WeakRef());
+	emit sig_Destroyed(sharedFromThis());
 	try
 	{
 		_resultWatcher.waitForFinished();
@@ -37,10 +37,12 @@ AlgNode::~AlgNode()
 	}
 	--_amount;
 }
-
+QSharedPointer<AlgNode> AlgNode::Clone()const
+{
+	GRAPH_NOT_IMPLEMENT;
+}
 void AlgNode::Init()
 {
-	SetSelfPointer();
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::INPUT, "in");
 	AddVertexAuto(AlgVertex::VertexType::OUTPUT, "out");
@@ -69,7 +71,7 @@ QWeakPointer<AlgVertex> AlgNode::AddVertex(AlgVertex::VertexType vertexType, QSt
 	GRAPH_ASSERT(_isUnchange == false);
 	GRAPH_ASSERT(GetVertexNames(vertexType).contains(name) == false);//TODO:需要判定重名，或者自动添加尾注（例如in_1,in_2）
 	
-	auto pv = AlgVertex::Create(StrongRef(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
+	auto pv = AlgVertex::Create(sharedFromThis(), vertexType, name, defaultState, beforeBehavior, afterBehavior, defaultData);
 	switch (vertexType)
 	{
 	case AlgVertex::VertexType::INPUT:
@@ -146,7 +148,6 @@ bool AlgNode::ConnectVertex(AlgVertex::VertexType vertexType, QString vertexName
 	qDebug() << srcVertex->objectName() + ':' + srcVertex->objectName()
 		<< dstNode->objectName() + ':' + dstVertex->objectName() << __FUNCTION__;
 	srcVertex->Connect(dstVertex);
-	//TODO:删除连接connect(srcVertex, &AlgGraphVertex::sig_ConnectionRemoved, this, [this](AlgGraphVertex*src, AlgGraphVertex*dst)
 
 	return true;
 }
@@ -182,7 +183,7 @@ void AlgNode::Run()
 	//TODO:加锁
 	qDebug() << objectName() << __FUNCTION__;
 	auto data = _LoadInput();
-	emit sig_ActivateFinished(StrongRef());
+	emit sig_ActivateFinished(sharedFromThis());
 	//TODO:暂停和退出
 	switch (_mode)
 	{
@@ -238,11 +239,11 @@ void AlgNode::Output()
 			Stop(true);
 		}
 	}
-	emit sig_RunFinished(StrongRef());
+	emit sig_RunFinished(sharedFromThis());
 	if (_stop == false)
 	{
 		_LoadOutput(_result);
-		emit sig_OutputFinished(StrongRef());
+		emit sig_OutputFinished(sharedFromThis());
 	}
 	_runningAmount--;
 	_isRunning = false;

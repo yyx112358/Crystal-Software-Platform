@@ -94,9 +94,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="global.h">
-      <Filter>_Global_</Filter>
-    </ClInclude>
     <ClInclude Include="entry.h">
       <Filter>_Global_</Filter>
     </ClInclude>
@@ -109,7 +106,7 @@
     <ClInclude Include="GuiConnection.h">
       <Filter>Viewer</Filter>
     </ClInclude>
-    <ClInclude Include="GraphSharedClass.h">
+    <ClInclude Include="global.h">
       <Filter>_Global_</Filter>
     </ClInclude>
   </ItemGroup>
@@ -122,9 +119,6 @@
     </QtMoc>
     <QtMoc Include="GraphScene.h">
       <Filter>Controller\Header Files</Filter>
-    </QtMoc>
-    <QtMoc Include="AlgNode.h">
-      <Filter>Model</Filter>
     </QtMoc>
     <QtMoc Include="Factory_Basic.h">
       <Filter>Controller\Header Files</Filter>
@@ -149,6 +143,9 @@
     </QtMoc>
     <QtMoc Include="GuiVertex.h">
       <Filter>Viewer</Filter>
+    </QtMoc>
+    <QtMoc Include="AlgNode.h">
+      <Filter>Model</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>

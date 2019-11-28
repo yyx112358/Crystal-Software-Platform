@@ -3,18 +3,16 @@
 #include "AlgVertex.h"
 
 #include "GraphError.h"
-#include "GraphSharedClass.h"
 #include <functional>
 #include <atomic>
 
 class GuiNode;
 
 class AlgNode
-	:public QObject, protected QEnableSharedFromThis<AlgNode>
+	:public QObject, public QEnableSharedFromThis<AlgNode>
 {
 	Q_OBJECT
-	Q_DISABLE_COPY(AlgNode)
-	GRAPH_ENABLE_SHARED(AlgNode)
+	GRAPH_SHARED_BASE_QOBJECT(AlgNode)
 public:
 	enum class RunMode :unsigned char
 	{
@@ -49,7 +47,6 @@ public:
 	};
 
 	virtual ~AlgNode();
-	virtual QSharedPointer<AlgNode>Clone()const { GRAPH_NOT_IMPLEMENT; }
 	virtual void Write() { GRAPH_NOT_IMPLEMENT; }
 	virtual void Read() { GRAPH_NOT_IMPLEMENT; }
 
@@ -83,7 +80,6 @@ public:
 	QList<QSharedPointer<const AlgVertex>> GetVertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<const AlgVertex>GetOneVertex(AlgVertex::VertexType type, QString name)const { return _FindVertex(type, name); }
 
-	static size_t GetAmount() { return _amount; }
 	static size_t GetRunningAmount() { return _runningAmount; }
 signals:
 	void sig_ActivateFinished(QSharedPointer<AlgNode>node);
@@ -121,12 +117,6 @@ protected:
 
 	mutable QSharedPointer<GuiNode>_gui = nullptr;
 private:
-#ifdef _DEBUG
-	QString __debugname;//调试用的，方便看名字
-	time_t __RunTime;//计时用的
-#endif // _DEBUG
-
-	static std::atomic_uint64_t _amount;//类实例总数
 	static std::atomic_uint64_t _runningAmount;
 };
 
