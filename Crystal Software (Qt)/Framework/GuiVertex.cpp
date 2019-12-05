@@ -14,6 +14,7 @@ GuiVertex::GuiVertex(QSharedPointer<const AlgVertex>vtx, QWeakPointer<const GuiN
 	setAcceptHoverEvents(true);
 	if (gnode.isNull() == false)
 		setZValue(gnode.lock()->zValue() + 0.1);
+	connect(vtx.data(), &AlgVertex::sig_Activated, [this] {update(); });
 }
 
 QVariant GuiVertex::itemChange(GraphicsItemChange change, const QVariant &value)
@@ -131,8 +132,15 @@ void GuiVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 	if (_hoverState == true) 
 	{
 		painter->setPen(QPen(QColor(160, 160, 160)));
+		if (algVertex.lock()->IsActivated() == true)
+		{
+			QBrush brush;
+			painter->setBrush(Qt::Dense5Pattern);
+			painter->setBrush(Qt::darkCyan);
+		}
 		painter->drawRect(bbox);
 	}
+
 }
 
 QSharedPointer<GuiVertex> GuiVertex::Clone()const

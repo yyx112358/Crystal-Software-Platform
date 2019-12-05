@@ -51,9 +51,25 @@ void AlgNode::Init()
 
 void AlgNode::Reset()
 {
-	blockSignals(true);
-	_resultWatcher.waitForFinished();
-	blockSignals(false);
+	if (_isRunning == true) 
+	{
+		Stop(true);
+// 		blockSignals(true);
+// 		_resultWatcher.waitForFinished();
+// 		blockSignals(false);
+		QSharedPointer<QMessageBox>pmsgBox;
+		while (_isRunning == true)
+		{
+			if (pmsgBox == nullptr) 
+			{
+				pmsgBox = QSharedPointer<QMessageBox>::create(QMessageBox::Information, QStringLiteral(""), "");
+				pmsgBox->show();
+			}
+			pmsgBox->setText(QStringLiteral("正在停止节点……\n剩余:") + QString::number(GetRunningAmount()));
+			QApplication::processEvents(QEventLoop::ProcessEventsFlag::ExcludeUserInputEvents);
+			QThread::msleep(1);
+		}
+	}
 	for (auto v : _inputVertex)
 		v->Reset();
 	for (auto v : _outputVertex)
@@ -61,6 +77,7 @@ void AlgNode::Reset()
 	_pause = false;
 	_stop = false;
 	_isRunning = false;
+	emit sig_ResetFinished(sharedFromThis());
 }
 
 QWeakPointer<AlgVertex> AlgNode::AddVertex(AlgVertex::VertexType vertexType, QString name, 
@@ -266,6 +283,9 @@ QVariantHash AlgNode::_Run(QVariantHash data)
 {
 	qDebug() << objectName() << data;
 	QVariantHash result;
+#ifdef _DEBUG
+	QThread::msleep(5000);
+#endif // _DEBUG
 	result["out"] = data["in"];
 	result["out_1"] = data["in_1"];
 	return result;

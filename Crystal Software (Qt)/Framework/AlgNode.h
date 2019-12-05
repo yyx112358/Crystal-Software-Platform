@@ -80,8 +80,16 @@ public:
 	QList<QSharedPointer<const AlgVertex>> GetVertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<const AlgVertex>GetOneVertex(AlgVertex::VertexType type, QString name)const { return _FindVertex(type, name); }
 
+	bool IsRunning()const { return _isRunning; }
+	bool IsEnable()const { return _isEnable; }
+	bool IsUnchange()const { return _isUnchange; }
+	bool IsPause()const { return _pause; }
+	bool IsStop()const { return _stop; }
+
 	static size_t GetRunningAmount() { return _runningAmount; }
 signals:
+	void sig_ResetFinished(QSharedPointer<AlgNode>node);//重置结束
+
 	void sig_ActivateFinished(QSharedPointer<AlgNode>node);
 	void sig_RunFinished(QSharedPointer<AlgNode>node);//运行结束
 	void sig_OutputFinished(QSharedPointer<AlgNode>node);//输出结束

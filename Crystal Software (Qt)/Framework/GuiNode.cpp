@@ -12,10 +12,18 @@ GuiNode::GuiNode(QSharedPointer<AlgNode>parent)
 	auto node = algnode.lock();
 	setObjectName(node->objectName());
 	connect(node.data(), &AlgNode::objectNameChanged, this, &GuiNode::setObjectName);
+
 	setTransformOriginPoint(boundingRect().center());//以中心为原点
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable);//可移动
 	//setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
 	setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);//可选中
+
+	auto fupdate = [this] {
+		update(); 
+	};
+	connect(algnode.data(), &AlgNode::sig_ResetFinished, this, fupdate);
+	connect(algnode.data(), &AlgNode::sig_ActivateFinished, this, fupdate);
+	connect(algnode.data(), &AlgNode::sig_RunFinished, this, fupdate);
 }
 
 
@@ -71,6 +79,10 @@ void GuiNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, Q
 	//auto oldpen = painter->pen();
 	if (isSelected() == true)
 		painter->setPen(Qt::DashLine);
+	if (algnode.lock()->IsRunning() == true)
+		painter->setPen(QColor(255, 0, 0));
+	else
+		painter->setPen(QColor(0, 0, 0));
 	//painter->setBackgroundMode(Qt::OpaqueMode);
 	QPainterPath path;
 	path.addRoundRect(boundingRect(), 25);
@@ -82,10 +94,11 @@ void GuiNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, Q
 		, option->fontMetrics.height(), objectName());
 }
 
-void GuiNode::update()
-{
-
-}
+// void GuiNode::update()
+// {
+// 	auto node = algnode.lock();
+// 	QGraphicsItem::update();
+// }
 
 void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 {

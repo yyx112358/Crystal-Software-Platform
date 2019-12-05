@@ -206,11 +206,11 @@ void Controller::slot_Start()
 {
 	try
 	{
+
 		for (auto &n : _nodes)
-		{
 			n->Reset();
+		for (auto &n : _nodes)
 			n->Activate();
-		}
 	}
 	catch (GraphError&e)
 	{
@@ -250,7 +250,7 @@ void Controller::timerEvent(QTimerEvent *event)
  		ui.lcdNumber_GuiNode->display(static_cast<int> (GuiNode::GetAmount()));
  		ui.lcdNumber_GuiVertex->display(static_cast<int> (GuiVertex::GetAmount()));
 		ui.lcdNumber_GuiConnection->display(static_cast<int>(GuiConnection::GetAmount()));
- 		ui.lcdNumber->display(static_cast<int> (_nodes.size()));
+ 		ui.lcdNumber->display(static_cast<int> (AlgNode::GetRunningAmount()));
 	}
 	if (event->timerId() == _refreshTimerId)
 	{

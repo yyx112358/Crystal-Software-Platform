@@ -112,10 +112,10 @@ void AlgVertex::Connect(QSharedPointer<AlgVertex>dstVertex)
 	_nextVertexes.append(dstVertex->sharedFromThis());
 	dstVertex->_prevVertexes.append(sharedFromThis());
 
-	if (type == AlgVertex::VertexType::INPUT)
+	//if (type == AlgVertex::VertexType::INPUT)
 		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::QueuedConnection);//必须改成QueuedConnection，否则是直连，相当于会递归调用进行深度优先遍历
-	else
-		connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
+	//else
+	//	connect(this, &AlgVertex::sig_Activated, dstVertex.data(), &AlgVertex::Activate, Qt::DirectConnection);
 
 	emit sig_ConnectionAdded(sharedFromThis(), dstVertex);
 }
@@ -170,7 +170,7 @@ void AlgVertex::Clear()
 
 QVariant AlgVertex::GetData() const
 {
-	if (_qdata.size() > 0)
+	if (IsActivated() == true)
 		return _qdata.front();
 	switch (_behaviorNoData)
 	{

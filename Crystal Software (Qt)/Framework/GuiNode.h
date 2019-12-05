@@ -42,7 +42,7 @@ public:
 
 	virtual QRectF boundingRect() const override;
 	virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
-	virtual void update();//
+	//virtual void update();//
 	virtual void refresh(){}
 
 	//QWeakPointer<GuiNode>WeakRef()const { return _weakRef; }
