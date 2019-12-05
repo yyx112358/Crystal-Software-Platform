@@ -24,7 +24,7 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="AlgorithmController.cpp">
+    <ClCompile Include="PluginFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,17 +32,14 @@
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AlgorithmController.h">
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="plugin_global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="algorithm_global.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <QtMoc Include="Interface.h">
+    <QtMoc Include="PluginFactory.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>

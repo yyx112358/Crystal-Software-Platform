@@ -1,11 +1,10 @@
-#include "stdafx.h"
-#include "CrystalSoftware.h"
 #include <QtWidgets/QApplication>
+#include "..\Framework\entry.h"
 
 int main(int argc, char *argv[])
 {
 	QApplication a(argc, argv);
-	CrystalSoftware w;
-	w.show();
+	QScopedPointer<QMainWindow> w(GetEntry());
+	w->show();
 	return a.exec();
 }

@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{1EA28E3F-40A1-4A25-AC77-62980F8D5C5D}</ProjectGuid>
+    <ProjectGuid>{B12702AD-ABFB-343A-A199-8E24837244A3}</ProjectGuid>
     <Keyword>QtVS_v301</Keyword>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -29,7 +29,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
-    <IncludePath>$(QtInclude)QtCore;$(QtInclude);$(IncludePath)</IncludePath>
+    <IncludePath>$(QtInclude);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
@@ -41,7 +41,6 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\OpenCV Debug 4-1-1 VC14 X64.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -52,11 +51,11 @@
   </ImportGroup>
   <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <QtInstall>msvc2015_64</QtInstall>
-    <QtModules>core</QtModules>
+    <QtModules>charts;concurrent;core;gui;widgets</QtModules>
   </PropertyGroup>
   <PropertyGroup Label="QtSettings" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <QtInstall>msvc2015_64</QtInstall>
-    <QtModules>core</QtModules>
+    <QtModules>charts;concurrent;core;gui;widgets</QtModules>
   </PropertyGroup>
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.props')">
     <Import Project="$(QtMsBuild)\qt.props" />
@@ -74,7 +73,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <PreprocessorDefinitions>ALGORITHM_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FRAMEWORK_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -94,7 +93,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
-      <PreprocessorDefinitions>ALGORITHM_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>FRAMEWORK_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -103,17 +102,48 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AlgorithmController.cpp" />
+    <ClCompile Include="AlgNode.cpp" />
+    <ClCompile Include="AlgNode_Input.cpp" />
+    <ClCompile Include="AlgNode_Output.cpp" />
+    <ClCompile Include="AlgVertex.cpp" />
+    <ClCompile Include="Controller.cpp" />
+    <ClCompile Include="entry.cpp" />
+    <ClCompile Include="Factory_Basic.cpp" />
+    <ClCompile Include="GraphScene.cpp" />
+    <ClCompile Include="GuiConnection.cpp" />
+    <ClCompile Include="GuiNode.cpp" />
+    <ClCompile Include="GuiNode_Input.cpp" />
+    <ClCompile Include="GuiNode_Output.cpp" />
+    <ClCompile Include="GuiVertex.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AlgorithmController.h" />
-    <ClInclude Include="algorithm_global.h" />
-    <QtMoc Include="Interface.h" />
+    <QtMoc Include="Controller.h" />
+    <QtMoc Include="AlgVertex.h" />
+    <QtMoc Include="AlgNode.h" />
+    <QtMoc Include="AlgNode_Input.h" />
+    <QtMoc Include="AlgNode_Output.h" />
+    <ClInclude Include="entry.h" />
+    <QtMoc Include="Factory_Basic.h" />
+    <ClInclude Include="global.h" />
+    <QtMoc Include="GraphError.h" />
+    <QtMoc Include="GraphScene.h" />
+    <ClInclude Include="GuiConnection.h" />
+    <QtMoc Include="GuiNode.h" />
+    <QtMoc Include="GuiNode_Input.h" />
+    <QtMoc Include="GuiNode_Output.h" />
+    <QtMoc Include="GuiVertex.h" />
+    <ClInclude Include="Interface_Factory.h" />
     <ClInclude Include="stdafx.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="Controller.ui" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Readme.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
