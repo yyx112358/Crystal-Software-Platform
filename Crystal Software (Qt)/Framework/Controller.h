@@ -31,6 +31,8 @@ private:
 	QList<QSharedPointer<AlgNode>>_nodes;
 	QList<QWeakPointer<AlgNode>>_resumeNodes;//TODO:用于暂停之后的重启
 
+	QSharedPointer<AlgNode>_FindNodes(const QWeakPointer<const AlgNode>node);
+
 	void slot_CreateNodeByButton();
 	void slot_AddConnection(QSharedPointer<GuiVertex> src, QSharedPointer<GuiVertex> dst);
 	void slot_RemoveItems(QList<QGraphicsItem*>items);

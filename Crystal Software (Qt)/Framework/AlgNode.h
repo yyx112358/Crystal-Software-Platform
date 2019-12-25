@@ -86,6 +86,9 @@ public:
 	bool IsPause()const { return _pause; }
 	bool IsStop()const { return _stop; }
 
+	QVariantHash GetUserProperty()const { return _userProperty; }
+	void SetUserProperty(QVariantHash property) { _userProperty = property; }
+
 	static size_t GetRunningAmount() { return _runningAmount; }
 signals:
 	void sig_ResetFinished(QSharedPointer<AlgNode>node);//重置结束
@@ -96,8 +99,8 @@ signals:
 
 	void sig_Destroyed(QWeakPointer<AlgNode>wp);//删除信号
 protected:
-
 	AlgNode(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
+	
 	QList<QSharedPointer<AlgVertex>>&_Vertexes(AlgVertex::VertexType type);
 	const QList<QSharedPointer<AlgVertex>>& _Vertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<AlgVertex>_FindVertex(AlgVertex::VertexType type, QString name);
@@ -122,6 +125,8 @@ protected:
 	std::atomic_bool _isUnchange = false;//不可在创建后修改
 	std::atomic_bool _pause = false;//暂停标志
 	std::atomic_bool _stop = false;//结束标志
+
+	QVariantHash _userProperty;//自定义信息
 
 	mutable QSharedPointer<GuiNode>_gui = nullptr;
 private:

@@ -145,6 +145,8 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 	}
 }
 
+
+
 void Controller::slot_CreateNodeByButton()
 {	
 	auto name = sender()->objectName();
@@ -258,5 +260,12 @@ void Controller::timerEvent(QTimerEvent *event)
 	}
 }
 
+QSharedPointer<AlgNode> Controller::_FindNodes(const QWeakPointer<const AlgNode>node)
+{
+	for (auto n : _nodes)
+		if (n == node)
+			return n;
+	return nullptr;
+}
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;

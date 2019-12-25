@@ -5,7 +5,7 @@
 AlgNode_Input::AlgNode_Input(QThreadPool&pool /*= *QThreadPool::globalInstance()*/, QObject*parent /*= nullptr*/)
 	: AlgNode(pool, parent)
 {
-	_mode = RunMode::Direct;
+	//_mode = RunMode::Direct;
 }
 
 void AlgNode_Input::Init()
@@ -15,6 +15,7 @@ void AlgNode_Input::Init()
 QVariantHash AlgNode_Input::_Run(QVariantHash data)
 {
 	GRAPH_ASSERT(_gui.isNull() == false);
+	//QThread::msleep(500);
 	data["out"] = _gui->GetData();
 	return data;
 }

@@ -92,6 +92,15 @@
     <ClCompile Include="GuiNode_Output.cpp">
       <Filter>Viewer\Subclass Source</Filter>
     </ClCompile>
+    <ClCompile Include="AlgNode_Constant.cpp">
+      <Filter>Model\Subclass Source</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomTypes.cpp">
+      <Filter>_Global_</Filter>
+    </ClCompile>
+    <ClCompile Include="GuiNode_Constant.cpp">
+      <Filter>Viewer\Subclass Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="entry.h">
@@ -107,6 +116,9 @@
       <Filter>Viewer</Filter>
     </ClInclude>
     <ClInclude Include="global.h">
+      <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomTypes.h">
       <Filter>_Global_</Filter>
     </ClInclude>
   </ItemGroup>
@@ -146,6 +158,12 @@
     </QtMoc>
     <QtMoc Include="AlgNode.h">
       <Filter>Model</Filter>
+    </QtMoc>
+    <QtMoc Include="AlgNode_Constant.h">
+      <Filter>Model\Subclass Header</Filter>
+    </QtMoc>
+    <QtMoc Include="GuiNode_Constant.h">
+      <Filter>Viewer\Subclass Header</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>

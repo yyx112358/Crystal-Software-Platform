@@ -5,9 +5,7 @@
 AlgNode_Output::AlgNode_Output(QThreadPool&pool /*= *QThreadPool::globalInstance()*/, QObject*parent /*= nullptr*/)
 	:AlgNode(pool,parent)
 {
-#ifndef _DEBUG
-	_mode = RunMode::Direct;
-#endif // _DEBUG
+	//_mode = RunMode::Direct;
 }
 
 void AlgNode_Output::Init()

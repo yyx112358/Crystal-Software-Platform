@@ -55,6 +55,7 @@ void GuiNode::InitApperance(QPointF center)
 
 QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 {
+	GRAPH_ASSERT(vtx != nullptr);
 	QSharedPointer<GuiVertex>gvtx = GuiVertex::Create(vtx, sharedFromThis());
 	connect(vtx.data(), &AlgVertex::sig_ConnectionAdded, gvtx.data(), &GuiVertex::AddConnection);
 	connect(vtx.data(), &AlgVertex::sig_ConnectionRemoved, gvtx.data(), &GuiVertex::RemoveConnection);

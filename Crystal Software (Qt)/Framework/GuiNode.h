@@ -55,8 +55,8 @@ protected:
 
  	QList<QSharedPointer<GuiVertex>>&_Vertexes(AlgVertex::VertexType type);
  	const QList<QSharedPointer<GuiVertex>>&_Vertexes(AlgVertex::VertexType type)const;
-	void _SortVertexesByName(AlgVertex::VertexType type);
-	void _ArrangeLocation();
+	virtual void _SortVertexesByName(AlgVertex::VertexType type);
+	virtual void _ArrangeLocation();
 
 	QList<QSharedPointer<GuiVertex>>_inputVertex;
 	QList<QSharedPointer<GuiVertex>>_outputVertex;

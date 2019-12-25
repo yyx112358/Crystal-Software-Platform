@@ -16,10 +16,7 @@ public:
 	virtual QString GetGuiAdvice() const override { return "Basic.Input"; }
 
 protected:
-
 	AlgNode_Input(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
 
-
 	virtual QVariantHash _Run(QVariantHash data) override;
-
 };

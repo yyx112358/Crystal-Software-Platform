@@ -197,7 +197,6 @@ void AlgNode::Activate()
 
 void AlgNode::Run()
 {
-	//TODO:¼ÓËø
 	qDebug() << objectName() << __FUNCTION__;
 	auto data = _LoadInput();
 	emit sig_ActivateFinished(sharedFromThis());
@@ -230,8 +229,6 @@ void AlgNode::Run()
 	default:
 		break;
 	}
-	//TODO:ÔÝÍ£ºÍÍË³ö
-	//emit sig_ResultReady();
 }
 
 void AlgNode::Output()
@@ -283,9 +280,9 @@ QVariantHash AlgNode::_Run(QVariantHash data)
 {
 	qDebug() << objectName() << data;
 	QVariantHash result;
-#ifdef _DEBUG
-	QThread::msleep(5000);
-#endif // _DEBUG
+ #ifdef _DEBUG
+ 	QThread::msleep(500);
+ #endif // _DEBUG
 	result["out"] = data["in"];
 	result["out_1"] = data["in_1"];
 	return result;

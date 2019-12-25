@@ -38,6 +38,7 @@ QMap<QString, QStringList> Factory_Basic::LoadFromAnother(Interface_Factory&anot
 
 #include "AlgNode_Input.h"
 #include "AlgNode_Output.h"
+#include "AlgNode_Constant.h"
 QHash<QString, AlgNode::FactoryInfo>& Factory_Basic::GetDefaultAlgNodeTbl() const
 {
 	static QHash<QString, AlgNode::FactoryInfo>tbl =
@@ -46,13 +47,14 @@ QHash<QString, AlgNode::FactoryInfo>& Factory_Basic::GetDefaultAlgNodeTbl() cons
  		{ "Basic.Input",AlgNode::FactoryInfo("Basic.Input",[] {return QSharedPointer<AlgNode_Input>::create(); }) },
  		{ "Basic.Output",AlgNode::FactoryInfo("Basic.Output",[] {return QSharedPointer<AlgNode_Output>::create(); }) },
 		{ "Basic.Add",AlgNode::FactoryInfo("Basic.Add",[] {return QSharedPointer<AlgNode>::create(); }) },
-		{ "Basic.Buffer",AlgNode::FactoryInfo("Basic.Buffer",[] {return QSharedPointer<AlgNode>::create(); }) },
+		{ "Basic.Constant",AlgNode::FactoryInfo("Basic.Constant",[] {return QSharedPointer<AlgNode_Constant>::create(); }) },
 	};
 	return tbl;
 }
 
 #include "GuiNode_Input.h"
 #include "GuiNode_Output.h"
+#include "GuiNode_Constant.h"
 QHash<QString, GuiNode::FactoryInfo>& Factory_Basic::GetDefaultGuiNodeTbl() const
 {
 	static QHash<QString, GuiNode::FactoryInfo>tbl =
@@ -60,6 +62,7 @@ QHash<QString, GuiNode::FactoryInfo>& Factory_Basic::GetDefaultGuiNodeTbl() cons
 		{"",GuiNode::FactoryInfo("",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode>::create(node); })},
 		{"Basic.Input",GuiNode::FactoryInfo("Basic.Input",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode_Input>::create(node); })},
 		{"Basic.Output",GuiNode::FactoryInfo("Basic.Output",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode_Output>::create(node); }) },
+		{ "Basic.Constant",GuiNode::FactoryInfo("Basic.Constant",[](QSharedPointer<AlgNode> node) {return QSharedPointer<GuiNode_Constant>::create(node); }) },
 	};
 	return tbl;
 }
