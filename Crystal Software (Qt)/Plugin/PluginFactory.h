@@ -12,12 +12,8 @@ class PLUGIN_EXPORT PluginFactory
 public:
 	PluginFactory();
 
-	virtual void LoadToStaticTbl() override;
-
-
-	virtual QStringList GetAlgNodeNames() override;
-
-
-	virtual QStringList GetGuiNodeNames() override;
+protected:
+	virtual const QHash<QString, AlgNode::FactoryInfo>& GetDefaultAlgNodeTbl() const override;
+	virtual const QHash<QString, GuiNode::FactoryInfo>& GetDefaultGuiNodeTbl() const override;
 
 };

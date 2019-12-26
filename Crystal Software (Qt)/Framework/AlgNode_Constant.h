@@ -17,6 +17,8 @@ public:
 	virtual void Init() override;
 	virtual QString GetGuiAdvice() const override { return "Basic.Constant"; }
 	
+	virtual Category GetCategory() const { return AlgNode::Category::CONSTANT; }
+
 	void SetData(QVariant data) { _data = data; }
 	QVariant GetData()const { return _data; }
 protected:

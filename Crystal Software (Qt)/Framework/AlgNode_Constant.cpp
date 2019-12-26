@@ -18,7 +18,7 @@ QVariantHash AlgNode_Constant::_Run(QVariantHash data)
 void AlgNode_Constant::Init()
 {
 	_isUnchange = false;
-	AddVertex(AlgVertex::VertexType::OUTPUT, "", AlgVertex::Behavior_NoData::USE_LAST_FIRST_DEFAULT,
+	AddVertex(AlgVertex::VertexType::OUTPUT, "  ", AlgVertex::Behavior_NoData::USE_LAST_FIRST_DEFAULT,
 		AlgVertex::Behavior_BeforeActivate::DIRECT, AlgVertex::Behavior_AfterActivate::KEEP, QVariant());
 	_isUnchange = true;
 }

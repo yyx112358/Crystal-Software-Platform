@@ -3,6 +3,8 @@
 #include "AlgVertex.h"
 #include "GuiNode.h"
 #include <QtConcurrent>
+#include <QMessageBox>
+#include <QInputDialog>
 
 std::atomic_uint64_t AlgNode::_amount = 0;
 std::atomic_uint64_t AlgNode::_runningAmount = 0;
@@ -349,6 +351,35 @@ QList<QSharedPointer<const AlgVertex>> AlgNode::GetVertexes(AlgVertex::VertexTyp
 			result.append(v); 
 		return result;
 	default:GRAPH_NOT_IMPLEMENT; break;
+	}
+}
+
+void AlgNode::ProcessAction(QString action, bool isChecked)
+{
+	if (action.isEmpty() == true)
+		return;
+	else if (action == "Thread")
+	{
+		GRAPH_ASSERT(_mode != RunMode::Function);
+		if (isChecked == true)
+			_mode = RunMode::Thread;
+		else
+			_mode = RunMode::Direct;
+	}
+	else if (action == "Add Input Auto")
+	{
+		AddVertexAuto(AlgVertex::VertexType::INPUT);
+	}
+	else if (action == "Add Output Auto")
+	{
+		AddVertexAuto(AlgVertex::VertexType::OUTPUT);
+	}
+	else if (action == "Rename")
+	{
+		QString newname = QInputDialog::getText(nullptr, "Rename", "Input a new name", QLineEdit::EchoMode::Normal,
+			objectName());
+		if (newname != nullptr)
+			setObjectName(newname);
 	}
 }
 

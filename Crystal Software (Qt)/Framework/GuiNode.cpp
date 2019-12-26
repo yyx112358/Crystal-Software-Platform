@@ -24,6 +24,7 @@ GuiNode::GuiNode(QSharedPointer<AlgNode>parent)
 	connect(algnode.data(), &AlgNode::sig_ResetFinished, this, fupdate);
 	connect(algnode.data(), &AlgNode::sig_ActivateFinished, this, fupdate);
 	connect(algnode.data(), &AlgNode::sig_RunFinished, this, fupdate);
+	connect(this, &GuiNode::sig_SendActionToAlg, algnode.data(), &AlgNode::ProcessAction);
 }
 
 
@@ -67,23 +68,36 @@ QWeakPointer<GuiVertex> GuiNode::AddVertex(QSharedPointer<AlgVertex>vtx)
 void GuiNode::RemoveVertex(QSharedPointer<const AlgVertex>vtx)
 {
 	_Vertexes(vtx->type).removeOne(vtx->GetGui());
+	_ArrangeLocation();
+	update();
 }
 
 QRectF GuiNode::boundingRect() const
 {
-	return QRectF(0, 0, 100, 100);
+	QFontMetrics fm(scene() != nullptr ? (scene()->font()) : (QApplication::font()));
+	if (algnode.isNull() == false) 
+	{
+		int height = (2 +
+			std::max(algnode.lock()->GetVertexes(AlgVertex::VertexType::INPUT).size(), algnode.lock()->GetVertexes(AlgVertex::VertexType::OUTPUT).size()))
+			*fm.height();
+		return QRectF(0, 0, 100, height);
+	}
+	else
+		return QRectF(0, 0, 100, 100);
 }
 
 void GuiNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget /*= nullptr*/)
 {
 	//边框
 	//auto oldpen = painter->pen();
+	QPen pen;
 	if (isSelected() == true)
-		painter->setPen(Qt::DashLine);
+		pen.setStyle(Qt::DashLine);
 	if (algnode.lock()->IsRunning() == true)
-		painter->setPen(QColor(255, 0, 0));
+		pen.setColor(QColor(255, 0, 0));
 	else
-		painter->setPen(QColor(0, 0, 0));
+		pen.setColor(QColor(0, 0, 0));
+	painter->setPen(pen);
 	//painter->setBackgroundMode(Qt::OpaqueMode);
 	QPainterPath path;
 	path.addRoundRect(boundingRect(), 25);
@@ -103,13 +117,31 @@ void GuiNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, Q
 
 void GuiNode::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 {
-	//static QSharedDataPointer<QString>defaultMenu;//TODO:之后可以用这种隐式共享指针来实现默认菜单。保证默认情况下共用一个默认表，而发生复制时候则自动复制
+	//static QSharedDataPointer<QString>defaultMenu;//TODO:之后可以用这种隐式共享指针来实现默认菜单。保证默认情况下共用一个默认表，而发生修改时候则自动复制
 	//QSharedDataPointer<QString>Menu=defaultMenu;
 	auto pos= event->screenPos();
+	auto node = algnode.lock();
+	if (node.isNull() == true)
+		return;
 	QMenu menu;
 	QList<QAction*> insitu, ctrler, alg;
+
+	alg.append(menu.addAction("Rename"));
+	alg.append(menu.addAction("edit"));
+	if (node->IsUnchange() == false) 
+	{
+		alg.append(menu.addAction("Add Input Auto"));
+		alg.append(menu.addAction("Add Output Auto"));
+	}
+	alg.append(menu.addAction("Thread"));
+	alg.back()->setCheckable(true);
+	alg.back()->setChecked(node->GetRunMode() != AlgNode::RunMode::Direct);
+	
+	menu.addSeparator();
 	ctrler.append(menu.addAction("delete"));
+
 	insitu.append(menu.addAction("bring to front"));
+
 	auto result = menu.exec(pos);
 	if (result != nullptr)
 	{

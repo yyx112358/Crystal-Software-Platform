@@ -101,6 +101,9 @@
     <ClCompile Include="GuiNode_Constant.cpp">
       <Filter>Viewer\Subclass Source</Filter>
     </ClCompile>
+    <ClCompile Include="AlgNode_DEMO.cpp">
+      <Filter>Model\Subclass Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="entry.h">
@@ -120,6 +123,9 @@
     </ClInclude>
     <ClInclude Include="CustomTypes.h">
       <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="AlgNode_DEMO.h">
+      <Filter>Model\Subclass Header</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -76,6 +76,10 @@ public:
 	QSharedPointer<const GuiNode>GetGui()const { return _gui; }
 	virtual QString GetGuiAdvice()const { return QString(); }
 
+	virtual QCommandLineParser& GetCommandLineParser()const {GRAPH_NOT_IMPLEMENT;}//TODO:命令行解析，也可以用来生成菜单或者进行存储
+	virtual bool ExecCommaneLine(const QStringList &arguments){GRAPH_NOT_IMPLEMENT;} //处理命令行
+	virtual void ProcessAction(QString action, bool isChecked);//TODO:暂时性的action处理函数，之后用ExecCommaneLine()替代
+
 	QStringList GetVertexNames(AlgVertex::VertexType type)const;
 	QList<QSharedPointer<const AlgVertex>> GetVertexes(AlgVertex::VertexType type)const;
 	QSharedPointer<const AlgVertex>GetOneVertex(AlgVertex::VertexType type, QString name)const { return _FindVertex(type, name); }
@@ -85,10 +89,13 @@ public:
 	bool IsUnchange()const { return _isUnchange; }
 	bool IsPause()const { return _pause; }
 	bool IsStop()const { return _stop; }
+	virtual Category GetCategory()const { return Category::BASIC; }
+	RunMode GetRunMode()const { return _mode; }
 
 	QVariantHash GetUserProperty()const { return _userProperty; }
 	void SetUserProperty(QVariantHash property) { _userProperty = property; }
 
+	
 	static size_t GetRunningAmount() { return _runningAmount; }
 signals:
 	void sig_ResetFinished(QSharedPointer<AlgNode>node);//重置结束
