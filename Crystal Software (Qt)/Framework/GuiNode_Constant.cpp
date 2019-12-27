@@ -8,7 +8,9 @@
 GuiNode_Constant::GuiNode_Constant(QSharedPointer<AlgNode>parent) 
 	:GuiNode(parent)
 {
+	QSharedPointer<AlgNode_Constant>node = parent.objectCast<AlgNode_Constant>();
 
+	connect(node.data(), &AlgNode_Constant::sig_DataChanged, [this] {_ArrangeLocation(); });
 }
 
 QRectF GuiNode_Constant::boundingRect() const

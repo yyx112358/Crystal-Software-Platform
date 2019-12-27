@@ -15,12 +15,16 @@ public:
 	virtual ~AlgNode_Constant() {}
 
 	virtual void Init() override;
-	virtual QString GetGuiAdvice() const override { return "Basic.Constant"; }
-	
+	virtual QString GetGuiAdvice() const override { return "Basic.Constant"; }	
 	virtual Category GetCategory() const { return AlgNode::Category::CONSTANT; }
 
 	void SetData(QVariant data) { _data = data; }
 	QVariant GetData()const { return _data; }
+
+	virtual void ProcessAction(QString action, bool isChecked) override;
+
+signals:
+	void sig_DataChanged(QVariant data);
 protected:
 	AlgNode_Constant(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
 

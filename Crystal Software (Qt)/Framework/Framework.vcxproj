@@ -132,7 +132,7 @@
     <QtMoc Include="AlgNode_Input.h" />
     <QtMoc Include="AlgNode_Output.h" />
     <QtMoc Include="AlgNode_Constant.h" />
-    <ClInclude Include="AlgNode_DEMO.h" />
+    <QtMoc Include="AlgNode_DEMO.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="entry.h" />
     <QtMoc Include="Factory_Basic.h" />
