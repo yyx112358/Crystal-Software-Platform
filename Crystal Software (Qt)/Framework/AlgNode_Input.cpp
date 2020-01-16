@@ -5,7 +5,8 @@
 AlgNode_Input::AlgNode_Input(QThreadPool&pool /*= *QThreadPool::globalInstance()*/, QObject*parent /*= nullptr*/)
 	: AlgNode(pool, parent)
 {
-	//_mode = RunMode::Direct;
+	_mode = RunMode::Direct;
+
 }
 
 void AlgNode_Input::Init()

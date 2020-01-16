@@ -4,7 +4,9 @@
 
 QSharedPointer<QWidget> GuiNode_Output::InitWidget(QWidget*parent)
 {
+//	QSharedPointer<QWidget>box(this);	
 	_panel = QSharedPointer<QLabel>::create(parent);
+	_panel.objectCast<QLabel>()->setFrameStyle(QFrame::Box | QFrame::Raised);
 	return _panel;
 }
 

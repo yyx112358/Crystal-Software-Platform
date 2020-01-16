@@ -72,6 +72,7 @@ public:
 
 	void AttachGui(QSharedPointer<GuiVertex>gui) { GRAPH_ASSERT(gui.isNull() == false); _gui = gui; }
 	QWeakPointer<GuiVertex>GetGui()const { return _gui; }
+	QWeakPointer<const AlgNode>GetNode()const { return _node; }
 
 	const VertexType type;
 

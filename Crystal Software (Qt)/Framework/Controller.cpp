@@ -90,7 +90,6 @@ void Controller::LoadFactory()
 }
 
 
-
 QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiClassname /*= QString()*/)
 {
 	try
@@ -101,7 +100,7 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 // 		{
 // 			_nodes.removeOne(wp);
 // 		}, Qt::DirectConnection);//注意不能连接QObject::destroyed信号，因为发出该信号时候派生类已经被析构了
-		node->setObjectName(node->metaObject()->className() + QString::number(_nodes.size()));//简单重命名
+		node->setObjectName(QString(node->metaObject()->className()).mid(sizeof("AlgNode")) + QString::number(_nodes.size()));//简单重命名
 		node->Init();
 
 		//生成GuiNode
@@ -131,8 +130,10 @@ QSharedPointer<AlgNode> Controller::AddNode(QString nodeClassname, QString guiCl
 		//TODO:分配不同种类
 		if (panel.isNull() == false) 
 		{
-			//if(gui->objectName()==)
-			ui.scrollAreaWidgetContents_Input->layout()->addWidget(panel.data());
+			auto layout = (node->GetCategory() == AlgNode::Category::INPUT)
+				? ui.scrollAreaWidgetContents_Input->layout()
+				: ui.scrollAreaWidgetContents_Output->layout();
+			layout->addWidget(panel.data());
 		}
 
 		_nodes.append(node);//放在最后，保证如果中间出现异常node可以被析构
@@ -186,7 +187,11 @@ void Controller::slot_RemoveItems(QList<QGraphicsItem*>items)
 		{
   			auto guiVtx = qgraphicsitem_cast<GuiVertex*>(item);
 			auto algVtx = guiVtx->algVertex.lock();
-			algVtx.constCast<AlgVertex>()->RemoveFromParent();
+			auto algnode = _FindNodes(algVtx->GetNode());
+			if (algnode->GetCategory() != AlgNode::Category::CONSTANT)
+				algVtx.constCast<AlgVertex>()->RemoveFromParent();
+			else
+				_nodes.removeAll(algnode);
 // 			auto algNode = guiVtx->guiNode.lock()->algnode.lock();
 // 			algNode.constCast<AlgNode>()->RemoveVertex(algVtx->type, algVtx->objectName());
 			break;

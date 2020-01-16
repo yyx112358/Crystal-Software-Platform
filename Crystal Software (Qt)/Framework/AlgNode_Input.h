@@ -15,6 +15,8 @@ public:
 	virtual void Init() override;
 	virtual QString GetGuiAdvice() const override { return "Basic.Input"; }
 
+	virtual Category GetCategory() const{return AlgNode::Category::INPUT;}
+
 protected:
 	AlgNode_Input(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造
 

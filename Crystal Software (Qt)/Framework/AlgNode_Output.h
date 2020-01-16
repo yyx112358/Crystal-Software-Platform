@@ -13,6 +13,8 @@ public:
 
 	virtual void Init() override;
 	virtual QString GetGuiAdvice() const override { return "Basic.Output"; }
+
+	virtual Category GetCategory() const { return AlgNode::Category::OUTPUT; }
 protected:
 
 	AlgNode_Output(QThreadPool&pool = *QThreadPool::globalInstance(), QObject*parent = nullptr);//放在这里表明只能由QSharedPointer构造

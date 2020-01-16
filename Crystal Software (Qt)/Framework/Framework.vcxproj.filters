@@ -101,6 +101,9 @@
     <ClCompile Include="GuiNode_Constant.cpp">
       <Filter>Viewer\Subclass Source</Filter>
     </ClCompile>
+    <ClCompile Include="AlgNode_DEMO.cpp">
+      <Filter>Model\Subclass Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="entry.h">
@@ -164,6 +167,9 @@
     </QtMoc>
     <QtMoc Include="GuiNode_Constant.h">
       <Filter>Viewer\Subclass Header</Filter>
+    </QtMoc>
+    <QtMoc Include="AlgNode_DEMO.h">
+      <Filter>Model\Subclass Header</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>

@@ -41,6 +41,7 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\OpenCV Debug 4-1-1 VC14 X64.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -104,6 +105,7 @@
   <ItemGroup>
     <ClCompile Include="AlgNode.cpp" />
     <ClCompile Include="AlgNode_Constant.cpp" />
+    <ClCompile Include="AlgNode_DEMO.cpp" />
     <ClCompile Include="AlgNode_Input.cpp" />
     <ClCompile Include="AlgNode_Output.cpp" />
     <ClCompile Include="AlgVertex.cpp" />
@@ -130,6 +132,7 @@
     <QtMoc Include="AlgNode_Input.h" />
     <QtMoc Include="AlgNode_Output.h" />
     <QtMoc Include="AlgNode_Constant.h" />
+    <QtMoc Include="AlgNode_DEMO.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="entry.h" />
     <QtMoc Include="Factory_Basic.h" />

@@ -5,17 +5,13 @@ PluginFactory::PluginFactory()
 {
 }
 
-void PluginFactory::LoadToStaticTbl()
+const QHash<QString, AlgNode::FactoryInfo>& PluginFactory::GetDefaultAlgNodeTbl() const
 {
-	throw std::logic_error("The method or operation is not implemented.");
+
 }
 
-QStringList PluginFactory::GetAlgNodeNames()
+const QHash<QString, GuiNode::FactoryInfo>& PluginFactory::GetDefaultGuiNodeTbl() const
 {
-	throw std::logic_error("The method or operation is not implemented.");
+
 }
 
-QStringList PluginFactory::GetGuiNodeNames()
-{
-	throw std::logic_error("The method or operation is not implemented.");
-}

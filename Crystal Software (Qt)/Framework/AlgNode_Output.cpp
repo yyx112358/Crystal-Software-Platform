@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "AlgNode_Output.h"
 #include "GuiNode_Output.h"
+#include "CustomTypes.h"
 
 AlgNode_Output::AlgNode_Output(QThreadPool&pool /*= *QThreadPool::globalInstance()*/, QObject*parent /*= nullptr*/)
 	:AlgNode(pool,parent)
@@ -19,7 +20,7 @@ QVariantHash AlgNode_Output::_Run(QVariantHash data)
 #ifdef _DEBUG
 	QThread::msleep(500);
 #endif // _DEBUG
-	_gui->SetData(data.value("in"));
+	_gui->SetData(QVariant2Description(data.value("in"), -1));
 	return data;
 }
 

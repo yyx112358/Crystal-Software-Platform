@@ -8,3 +8,5 @@
 #ifdef _DEBUG
 #include <vld.h>
 #endif // _DEBUG
+
+#include <opencv.hpp>

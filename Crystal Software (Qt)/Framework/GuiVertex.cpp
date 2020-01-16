@@ -129,18 +129,18 @@ void GuiVertex::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 	{
 		painter->setBrush(Qt::Dense5Pattern);
 	}
-	if (_hoverState == true) 
-	{
+	if (_hoverState == true)
 		painter->setPen(QPen(QColor(160, 160, 160)));
-		if (algVertex.lock()->IsActivated() == true)
-		{
-			QBrush brush;
-			painter->setBrush(Qt::Dense5Pattern);
-			painter->setBrush(Qt::darkCyan);
-		}
-		painter->drawRect(bbox);
+	else
+		painter->setPen(QPen(QColor(255, 255, 255, 0)));
+	if (algVertex.lock()->IsActivated() == true)
+	{
+		QBrush brush;
+		brush.setStyle(Qt::BrushStyle::Dense5Pattern);
+		brush.setColor(Qt::darkCyan);
+		painter->setBrush(brush);
 	}
-
+	painter->drawRect(bbox);
 }
 
 QSharedPointer<GuiVertex> GuiVertex::Clone()const
