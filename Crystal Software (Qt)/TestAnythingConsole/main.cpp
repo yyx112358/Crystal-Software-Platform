@@ -9,7 +9,7 @@ using namespace cv;
 //Reference:https://www.learnopencv.com/image-quality-assessment-brisque/
 namespace Mine
 {
-#define BRISQUE_SINGLE_PRECISION//以单精度运算BRISQUE
+#define BRISQUE_SINGLE_PRECISION//以单精度运算BRISQUE，以一定的精度损失换来一倍的效率提升
 #ifndef BRISQUE_SINGLE_PRECISION
 	const int BRISQUE_MAT_TYPE = CV_64F;
 	typedef double BRISQUE_ELEMENT_TYPE;
@@ -17,7 +17,7 @@ namespace Mine
 	const int BRISQUE_MAT_TYPE = CV_32F;
 	typedef float BRISQUE_ELEMENT_TYPE;
 #endif
-
+	//计算MSCN系数
 	cv::Mat CalcMSCN(cv::Mat inputImg)
 	{
 		CV_Assert((inputImg.channels() == 1 || inputImg.channels() == 3));
@@ -32,99 +32,28 @@ namespace Mine
 		if (img.depth() != BRISQUE_MAT_TYPE)
 			img.convertTo(img, BRISQUE_MAT_TYPE);
 
+		// compute mu (local mean局部均值)
 		cv::Mat mu;
 		GaussianBlur(img, mu, cv::Size(7, 7), 7.0 / 6);
 
+		//compute sigma (local sigma局部方差)
 		cv::Mat sigma = img.mul(img);
 		GaussianBlur(sigma, sigma, cv::Size(7, 7), 7.0 / 6);
 		sigma -= mu.mul(mu);
 		sigma = cv::abs(sigma);
 		cv::sqrt(sigma, sigma);
 
+		//计算MSCN系数
 		cv::Mat structdis;/*(img - mu) / (sigma + 1)//拆开并使用原位运算，减少中间变量，从而提高速度*/
 		structdis = img - mu;
-		sigma += 1;
-		structdis /= sigma;//	cv::divide(structdis, sigma, structdis);
+		sigma += 1;//避免0除错误
+		structdis /= sigma;
 		return structdis;
-	}
-
-	void AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsigma_best, double& gamma_best);
-
-	void ComputeBrisqueFeature(const cv::Mat& orig, std::vector<double>& featurevector)
-	{
-		cv::Mat orig_bw;
-		// convert to grayscale 
-		if (orig.channels() == 3)
-			cvtColor(orig, orig_bw, cv::COLOR_BGR2GRAY);
-		else
-			orig_bw = orig.clone();
-		// create a copy of original image	
-		if (orig_bw.depth() != BRISQUE_MAT_TYPE)
-			orig_bw.convertTo(orig_bw, BRISQUE_MAT_TYPE);
-
-		// orig_bw now contains the grayscale image normalized to the range 0,1
-
-		int scalenum = 2; // number of times to scale the image
-		for (int itr_scale = 1; itr_scale <= scalenum; itr_scale++)
-		{
-			// resize image
-			cv::Size dst_size(orig_bw.cols / cv::pow((double)2, itr_scale - 1), orig_bw.rows / pow((double)2, itr_scale - 1));
-			if (dst_size.height == 0)dst_size.height = 1;
-			if (dst_size.width == 0)dst_size.width = 1;
-			cv::Mat imdist_scaled;
-			if (itr_scale == 1)
-				imdist_scaled = orig_bw;
-			else
-				resize(orig_bw, imdist_scaled, dst_size, 0, 0, cv::INTER_NEAREST);
-
-			// calculating MSCN coefficients
-			cv::Mat structdis = CalcMSCN(imdist_scaled);
-
-			// Compute AGGD fit to MSCN image
-			double lsigma_best, rsigma_best, gamma_best;
-			/*structdis = */AGGDfit(structdis, lsigma_best, rsigma_best, gamma_best);
-			featurevector.push_back(gamma_best);
-			featurevector.push_back((lsigma_best*lsigma_best + rsigma_best*rsigma_best) / 2);
-
-			// Compute paired product images
-			// indices for orientations (H, V, D1, D2)
-			int shifts[4][2] = { { 0,1 },{ 1,0 },{ 1,1 },{ -1,1 } };
-			cv::Mat shifted_structdis;
-			for (int itr_shift = 0; itr_shift < 4; itr_shift++)
-			{
-				int shiftX = shifts[itr_shift][1], shiftY = shifts[itr_shift][0];
-				cv::copyMakeBorder(structdis(cv::Rect(1, 1, structdis.cols - 2, structdis.rows - 2)), shifted_structdis,
-					1 - shiftY, 1 + shiftY, 1 - shiftX, 1 + shiftX, cv::BORDER_CONSTANT, cv::Scalar::all(0));//向H,V方向偏移（因为copyMakeBorder不能扩展负数，所以写成这样）
-				multiply(structdis, shifted_structdis, shifted_structdis);
-				/*shifted_structdis = */AGGDfit(shifted_structdis, lsigma_best, rsigma_best, gamma_best);
-
-				double constant = sqrt(tgamma(1 / gamma_best)) / sqrt(tgamma(3 / gamma_best));
-				double meanparam = (rsigma_best - lsigma_best)*(tgamma(2 / gamma_best) / tgamma(1 / gamma_best))*constant;
-
-				// push the calculated parameters from AGGD fit to pair-wise products
-				featurevector.push_back(gamma_best);
-				featurevector.push_back(meanparam);
-				featurevector.push_back(cv::pow(lsigma_best, 2));
-				featurevector.push_back(cv::pow(rsigma_best, 2));
-			}
-		}
-		/*
-			vector<double>test{ 0.851992,0.168142,0.433998,0.0291638,0.0297237,0.052905,0.439998,0.0305187,0.0280048,0.0515923,0.441998,-0.00765173,0.0426343,0.0366834,0.445998,-0.0114788,0.0435619,0.034746,0.903992,0.227309,0.430998,-0.0142514,0.0891312,0.073052,0.447998,-0.0438846,0.104758,0.0569214,0.444998,-0.025868,0.0885601,0.0611293,0.447998,-0.036822,0.094934,0.056039, };
-
-			for (auto i=0;i<featurevector.size();i++)
-			{
-				//cout << featurevector[i] << ",";
-				cout << featurevector[i] << "\t" << test[i] << endl;
-				assert(abs(featurevector[i] - test[i]) < 0.0001);
-			}
-		//	system("pause");
-			cout << endl;*/
 	}
 
 	// function to compute best fit parameters from AGGDfit 
 	void AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsigma_best, double& gamma_best)
 	{
-		// create a copy of an image using BwImage constructor (brisque.h - more info)
 		CV_Assert(structdis.depth() == BRISQUE_MAT_TYPE);
 
 		long int poscount = 0, negcount = 0;
@@ -136,16 +65,16 @@ namespace Mine
 			{
 				double pt = pRow[j];
 				if (pt > 0)
-				{					
+				{
 					abssum += pt;
-					possqsum += pt*pt;	
-					poscount++;				
+					possqsum += pt*pt;
+					poscount++;
 				}
 				else if (pt < 0)
-				{					
-					abssum -= pt;	
-					negsqsum += pt*pt;	
-					negcount++;								
+				{
+					abssum -= pt;
+					negsqsum += pt*pt;
+					negcount++;
 				}
 			}
 		}
@@ -188,6 +117,94 @@ namespace Mine
 		}
 		gamma_best = prevgamma;
 	}
+
+	//计算BRISQUE特征向量（输出double精度行向量）
+	void ComputeBrisqueFeature(const cv::Mat& orig, cv::Mat& featureVector)
+	{
+		cv::Mat orig_bw;
+		// convert to grayscale 
+		if (orig.channels() == 3)
+			cvtColor(orig, orig_bw, cv::COLOR_BGR2GRAY);
+		else
+			orig_bw = orig.clone();
+		// create a copy of original image	
+		if (orig_bw.depth() != BRISQUE_MAT_TYPE)
+			orig_bw.convertTo(orig_bw, BRISQUE_MAT_TYPE);
+
+		// orig_bw now contains the grayscale image normalized to the range 0,1
+		featureVector = cv::Mat(cv::Size(0, 0), BRISQUE_MAT_TYPE);
+		int scalenum = 2; // number of times to scale the image
+		for (int itr_scale = 1; itr_scale <= scalenum; itr_scale++)
+		{
+			// resize image
+			cv::Size dst_size(orig_bw.cols / cv::pow((double)2, itr_scale - 1), orig_bw.rows / pow((double)2, itr_scale - 1));
+			if (dst_size.height == 0)dst_size.height = 1;
+			if (dst_size.width == 0)dst_size.width = 1;
+			cv::Mat imdist_scaled;
+			if (itr_scale == 1)
+				imdist_scaled = orig_bw;
+			else
+				resize(orig_bw, imdist_scaled, dst_size, 0, 0, cv::INTER_NEAREST);
+
+			// calculating MSCN coefficients
+			cv::Mat structdis = CalcMSCN(imdist_scaled);
+
+			// Compute AGGD fit to MSCN image
+			double lsigma_best, rsigma_best, gamma_best;
+			/*structdis = */AGGDfit(structdis, lsigma_best, rsigma_best, gamma_best);
+			featureVector.push_back(gamma_best);
+			featureVector.push_back((lsigma_best*lsigma_best + rsigma_best*rsigma_best) / 2);
+
+			// Compute paired product images
+			// indices for orientations (H, V, D1, D2)
+			int shifts[4][2] = { { 0,1 },{ 1,0 },{ 1,1 },{ -1,1 } };
+			cv::Mat shifted_structdis;
+			for (int itr_shift = 0; itr_shift < 4; itr_shift++)
+			{
+				int shiftX = shifts[itr_shift][1], shiftY = shifts[itr_shift][0];
+				cv::copyMakeBorder(structdis(cv::Rect(1, 1, structdis.cols - 2, structdis.rows - 2)), shifted_structdis,
+					1 - shiftY, 1 + shiftY, 1 - shiftX, 1 + shiftX, cv::BORDER_CONSTANT, cv::Scalar::all(0));//向H,V方向偏移（因为copyMakeBorder不能扩展负数，所以写成这样）
+				multiply(structdis, shifted_structdis, shifted_structdis);
+				/*shifted_structdis = */AGGDfit(shifted_structdis, lsigma_best, rsigma_best, gamma_best);
+
+				double constant = sqrt(tgamma(1 / gamma_best)) / sqrt(tgamma(3 / gamma_best));
+				double meanparam = (rsigma_best - lsigma_best)*(tgamma(2 / gamma_best) / tgamma(1 / gamma_best))*constant;
+
+				// push the calculated parameters from AGGD fit to pair-wise products
+				featureVector.push_back(gamma_best);
+				featureVector.push_back(meanparam);
+				featureVector.push_back(cv::pow(lsigma_best, 2));
+				featureVector.push_back(cv::pow(rsigma_best, 2));
+			}
+			
+		}
+		/*
+			vector<double>test{ 0.851992,0.168142,0.433998,0.0291638,0.0297237,0.052905,0.439998,0.0305187,0.0280048,0.0515923,0.441998,-0.00765173,0.0426343,0.0366834,0.445998,-0.0114788,0.0435619,0.034746,0.903992,0.227309,0.430998,-0.0142514,0.0891312,0.073052,0.447998,-0.0438846,0.104758,0.0569214,0.444998,-0.025868,0.0885601,0.0611293,0.447998,-0.036822,0.094934,0.056039, };
+
+			for (auto i=0;i<featurevector.size();i++)
+			{
+				//cout << featurevector[i] << ",";
+				cout << featurevector[i] << "\t" << test[i] << endl;
+				assert(abs(featurevector[i] - test[i]) < 0.0001);
+			}
+		//	system("pause");
+			cout << endl;*/
+		featureVector =  featureVector.reshape(1, 1);//变换为行向量
+	}
+	class Brisque
+	{
+	public:
+		Brisque();
+		Brisque(std::string modelPath, std::string rangePath);
+		Brisque(cv::Ptr<cv::ml::SVM>model, cv::Mat range);
+
+		bool train(cv::Mat featureMat,cv::Mat labelMat);
+		double computeScore(cv::Mat image);
+	private:
+		cv::Ptr<cv::ml::SVM>_svmModel;
+		cv::Mat _rangeModel;				
+	};
+	//void NormalizeBrisqueFeatureArray()
 }
 namespace Old
 {
@@ -400,14 +417,15 @@ int main(int argc, char *argv[])
 		{
 			string path = "F:\\Users\\Horizon\\Pictures\\Saved Pictures\\Crystal_";
 			int64 usedTime1 = 0, usedTime2 = 0;
-#pragma omp parallel for
+
 			for (auto i = 0; i < 500; i++)
 			{
 				string filename = //"F:\\Users\\Horizon\\Pictures\\lovewallpaper\\2(4K) (2).jpg";
 					//"G:\\opencv\\Tool\\tid2013\\reference_images\\I05.BMP";
 				path + to_string(i) + ".png";
 				Mat img = imread(filename, IMREAD_GRAYSCALE);
-				vector<double>feature1, feature2;
+				cv::Mat feature1;
+				std::vector<double>feature2;
 
 				cout << filename << "   ";
 				int64 timeBegin = cv::getTickCount();
@@ -432,18 +450,7 @@ int main(int argc, char *argv[])
 	else
 	{
 		cout << "操作：\n"
-			"1.重新分割并记录在xml\n"
-			"2.主方向分析（获取主轴并保存）[依赖1]\n"
-			"3.提取特征[依赖1，2]\n"
-			"4.主观评分[依赖1]\n"
-			"5.模型训练[依赖3,4]\n"
-			"6.评估\n"
-			"====写论文用====\n"
-			"q.查看Lab图像\n"
-			"w.查看尺寸分布\n"
-			"e.将xml重新保存为图像\n"
-			"r.读取csv，并统计尺寸分布\n"
-			"t.重写BRISQUE"
+			"1.重写BRISQUE\n"
 			"~.退出\n" << endl;
 	}
 	system("pause");
