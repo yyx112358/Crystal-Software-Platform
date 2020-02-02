@@ -1,406 +1,17 @@
-#include "stdafx.h"
+Ôªø#include "stdafx.h"
 
-#include <vector>
-#include <string>
+#include <QDir>
+#include <QFile>
+#include <QtConcurrent>
+#include <set>
+
+#include "Brisque.h"
 
 using namespace std;
 using namespace cv; 
+using namespace NewBrisque;
+//using namespace OldBrisque;
 
-//Reference:https://www.learnopencv.com/image-quality-assessment-brisque/
-namespace Mine
-{
-#define BRISQUE_SINGLE_PRECISION//“‘µ•æ´∂»‘ÀÀ„BRISQUE£¨“‘“ª∂®µƒæ´∂»À ßªª¿¥“ª±∂µƒ–ß¬ Ã·…˝
-#ifndef BRISQUE_SINGLE_PRECISION
-	const int BRISQUE_MAT_TYPE = CV_64F;
-	typedef double BRISQUE_ELEMENT_TYPE;
-#else
-	const int BRISQUE_MAT_TYPE = CV_32F;
-	typedef float BRISQUE_ELEMENT_TYPE;
-#endif
-	//º∆À„MSCNœµ ˝
-	cv::Mat CalcMSCN(cv::Mat inputImg)
-	{
-		CV_Assert((inputImg.channels() == 1 || inputImg.channels() == 3));
-
-		cv::Mat img;
-		if (inputImg.channels() == 3)
-			cv::cvtColor(inputImg, img, cv::COLOR_BGR2GRAY);
-		else if (inputImg.channels() == 1)
-			img = inputImg;
-		else
-			throw "Not support image without 1 or 3 channels";
-		if (img.depth() != BRISQUE_MAT_TYPE)
-			img.convertTo(img, BRISQUE_MAT_TYPE);
-
-		// compute mu (local meanæ÷≤øæ˘÷µ)
-		cv::Mat mu;
-		GaussianBlur(img, mu, cv::Size(7, 7), 7.0 / 6);
-
-		//compute sigma (local sigmaæ÷≤ø∑Ω≤Ó)
-		cv::Mat sigma = img.mul(img);
-		GaussianBlur(sigma, sigma, cv::Size(7, 7), 7.0 / 6);
-		sigma -= mu.mul(mu);
-		sigma = cv::abs(sigma);
-		cv::sqrt(sigma, sigma);
-
-		//º∆À„MSCNœµ ˝
-		cv::Mat structdis;/*(img - mu) / (sigma + 1)//≤ø™≤¢ π”√‘≠Œª‘ÀÀ„£¨ºı…Ÿ÷–º‰±‰¡ø£¨¥”∂¯Ã·∏ﬂÀŸ∂»*/
-		structdis = img - mu;
-		sigma += 1;//±‹√‚0≥˝¥ÌŒÛ
-		structdis /= sigma;
-		return structdis;
-	}
-
-	// function to compute best fit parameters from AGGDfit 
-	void AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsigma_best, double& gamma_best)
-	{
-		CV_Assert(structdis.depth() == BRISQUE_MAT_TYPE);
-
-		long int poscount = 0, negcount = 0;
-		double possqsum = 0, negsqsum = 0, abssum = 0;
-		for (int i = 0; i < structdis.rows; i++)//∑¢œ÷’‚—˘–¥µƒÀŸ∂»≥¨π˝¡Àparallel_for∫ÕforEach£¨ªÚ–Ì «“ÚŒ™≤ª¥Ê‘⁄∂‘π≤œÌ±‰¡øµƒ“¿¿µÕ¨ ±ƒ⁄≤ø¥Ê‘⁄◊≈if£ø
-		{
-			BRISQUE_ELEMENT_TYPE*pRow = (BRISQUE_ELEMENT_TYPE*)(structdis.data + i*structdis.step);
-			for (int j = 0; j < structdis.cols; j++)
-			{
-				double pt = pRow[j];
-				if (pt > 0)
-				{
-					abssum += pt;
-					possqsum += pt*pt;
-					poscount++;
-				}
-				else if (pt < 0)
-				{
-					abssum -= pt;
-					negsqsum += pt*pt;
-					negcount++;
-				}
-			}
-		}
-
-		//	≤ªƒ‹”√forEach£¨“ÚŒ™…Êº∞µΩ∂‘poscountµ»—≠ª∑ÃÂÕ‚≤ø±‰¡øµƒ∏ƒ–¥£¨¥Ê‘⁄∂‡œﬂ≥Ã≥ÂÕª πµ√Ω·π˚¥ÌŒÛ
-		// 	structdis.forEach<double>( [&poscount2,&negcount2,&possqsum2, &negsqsum2, &abssum2](double pixel,const int position[])->void
-		// 	{
-		// 		if (pixel > 0)
-		// 		{
-		// 			poscount2++;
-		// 			possqsum2 += pixel*pixel;
-		// 			abssum2 += pixel;
-		// 		}
-		// 		else if (pixel < 0)
-		// 		{
-		// 			negcount2++;
-		// 			negsqsum2 += pixel*pixel;
-		// 			abssum2 -= pixel;
-		// 		}
-		// 	});
-		lsigma_best = cv::sqrt(negsqsum / negcount);
-		rsigma_best = cv::sqrt(possqsum / poscount);
-
-		double gammahat = lsigma_best / rsigma_best;
-		long int totalcount = (structdis.cols)*(structdis.rows);
-		double rhat = cv::pow(abssum / totalcount, 2.0) / ((negsqsum + possqsum) / totalcount);
-		double rhatnorm = rhat*(cv::pow(gammahat, 3) + 1)*(gammahat + 1) / pow(pow(gammahat, 2) + 1, 2);
-
-		double prevgamma = 0;
-		double prevdiff = 1e10;
-		float sampling = 0.001f;
-		for (float gam = 0.2f; gam < 10; gam += sampling) //possible to coarsen sampling to quicken the code, with some loss of accuracy
-		{
-			double tg2 = tgamma(2 / gam);
-			double r_gam = tg2*tg2 / (tgamma(1 / gam)*tgamma(3 / gam));
-			double diff = abs(r_gam - rhatnorm);
-			if (diff > prevdiff) break;
-			prevdiff = diff;
-			prevgamma = gam;
-		}
-		gamma_best = prevgamma;
-	}
-
-	//º∆À„BRISQUEÃÿ’˜œÚ¡ø£® ‰≥ˆdoubleæ´∂»––œÚ¡ø£©
-	void ComputeBrisqueFeature(const cv::Mat& orig, cv::Mat& featureVector)
-	{
-		cv::Mat orig_bw;
-		// convert to grayscale 
-		if (orig.channels() == 3)
-			cvtColor(orig, orig_bw, cv::COLOR_BGR2GRAY);
-		else
-			orig_bw = orig.clone();
-		// create a copy of original image	
-		if (orig_bw.depth() != BRISQUE_MAT_TYPE)
-			orig_bw.convertTo(orig_bw, BRISQUE_MAT_TYPE);
-
-		// orig_bw now contains the grayscale image normalized to the range 0,1
-		featureVector = cv::Mat(cv::Size(0, 0), BRISQUE_MAT_TYPE);
-		int scalenum = 2; // number of times to scale the image
-		for (int itr_scale = 1; itr_scale <= scalenum; itr_scale++)
-		{
-			// resize image
-			cv::Size dst_size(orig_bw.cols / cv::pow((double)2, itr_scale - 1), orig_bw.rows / pow((double)2, itr_scale - 1));
-			if (dst_size.height == 0)dst_size.height = 1;
-			if (dst_size.width == 0)dst_size.width = 1;
-			cv::Mat imdist_scaled;
-			if (itr_scale == 1)
-				imdist_scaled = orig_bw;
-			else
-				resize(orig_bw, imdist_scaled, dst_size, 0, 0, cv::INTER_NEAREST);
-
-			// calculating MSCN coefficients
-			cv::Mat structdis = CalcMSCN(imdist_scaled);
-
-			// Compute AGGD fit to MSCN image
-			double lsigma_best, rsigma_best, gamma_best;
-			/*structdis = */AGGDfit(structdis, lsigma_best, rsigma_best, gamma_best);
-			featureVector.push_back(gamma_best);
-			featureVector.push_back((lsigma_best*lsigma_best + rsigma_best*rsigma_best) / 2);
-
-			// Compute paired product images
-			// indices for orientations (H, V, D1, D2)
-			int shifts[4][2] = { { 0,1 },{ 1,0 },{ 1,1 },{ -1,1 } };
-			cv::Mat shifted_structdis;
-			for (int itr_shift = 0; itr_shift < 4; itr_shift++)
-			{
-				int shiftX = shifts[itr_shift][1], shiftY = shifts[itr_shift][0];
-				cv::copyMakeBorder(structdis(cv::Rect(1, 1, structdis.cols - 2, structdis.rows - 2)), shifted_structdis,
-					1 - shiftY, 1 + shiftY, 1 - shiftX, 1 + shiftX, cv::BORDER_CONSTANT, cv::Scalar::all(0));//œÚH,V∑ΩœÚ∆´“∆£®“ÚŒ™copyMakeBorder≤ªƒ‹¿©’π∏∫ ˝£¨À˘“‘–¥≥…’‚—˘£©
-				multiply(structdis, shifted_structdis, shifted_structdis);
-				/*shifted_structdis = */AGGDfit(shifted_structdis, lsigma_best, rsigma_best, gamma_best);
-
-				double constant = sqrt(tgamma(1 / gamma_best)) / sqrt(tgamma(3 / gamma_best));
-				double meanparam = (rsigma_best - lsigma_best)*(tgamma(2 / gamma_best) / tgamma(1 / gamma_best))*constant;
-
-				// push the calculated parameters from AGGD fit to pair-wise products
-				featureVector.push_back(gamma_best);
-				featureVector.push_back(meanparam);
-				featureVector.push_back(cv::pow(lsigma_best, 2));
-				featureVector.push_back(cv::pow(rsigma_best, 2));
-			}
-			
-		}
-		/*
-			vector<double>test{ 0.851992,0.168142,0.433998,0.0291638,0.0297237,0.052905,0.439998,0.0305187,0.0280048,0.0515923,0.441998,-0.00765173,0.0426343,0.0366834,0.445998,-0.0114788,0.0435619,0.034746,0.903992,0.227309,0.430998,-0.0142514,0.0891312,0.073052,0.447998,-0.0438846,0.104758,0.0569214,0.444998,-0.025868,0.0885601,0.0611293,0.447998,-0.036822,0.094934,0.056039, };
-
-			for (auto i=0;i<featurevector.size();i++)
-			{
-				//cout << featurevector[i] << ",";
-				cout << featurevector[i] << "\t" << test[i] << endl;
-				assert(abs(featurevector[i] - test[i]) < 0.0001);
-			}
-		//	system("pause");
-			cout << endl;*/
-		featureVector =  featureVector.reshape(1, 1);//±‰ªªŒ™––œÚ¡ø
-	}
-	class Brisque
-	{
-	public:
-		Brisque();
-		Brisque(std::string modelPath, std::string rangePath);
-		Brisque(cv::Ptr<cv::ml::SVM>model, cv::Mat range);
-
-		bool train(cv::Mat featureMat,cv::Mat labelMat);
-		double computeScore(cv::Mat image);
-	private:
-		cv::Ptr<cv::ml::SVM>_svmModel;
-		cv::Mat _rangeModel;				
-	};
-	//void NormalizeBrisqueFeatureArray()
-}
-namespace Old
-{
-	template<class T> class Image
-	{
-	private:
-
-		cv::Mat imgp;
-	public:
-		Image(cv::Mat img = 0)
-		{
-			imgp = img.clone();
-		}
-		~Image()
-		{
-			imgp = 0;
-		}
-		cv::Mat equate(cv::Mat img)
-		{
-			img = imgp.clone();
-			return img;
-		}
-		void showimage() {
-			cv::imshow("imgp", imgp);
-			cv::waitKey(0);
-			cv::destroyAllWindows();
-		}
-		inline T* operator[](const int rowIndx)
-		{
-			//imgp->data and imgp->width
-			return (T*)(imgp.data + rowIndx*imgp.step);
-		}
-	};
-
-	typedef Image<double> BwImage;
-	cv::Mat AGGDfit(cv::Mat structdis, double& lsigma_best, double& rsigma_best, double& gamma_best);
-
-	void ComputeBrisqueFeature(const cv::Mat& orig, std::vector<double>& featurevector)
-	{
-		cv::Mat orig_bw_int;
-		// convert to grayscale 
-		if (orig.channels() == 3)
-			cvtColor(orig, orig_bw_int, cv::COLOR_BGR2GRAY);
-		else
-			orig_bw_int = orig.clone();
-		// create a copy of original image
-		cv::Mat orig_bw(orig_bw_int.size(), CV_64FC1, 1);
-		orig_bw_int.convertTo(orig_bw, 1.0 / 255);
-		orig_bw_int.release();
-
-		// orig_bw now contains the grayscale image normalized to the range 0,1
-
-		int scalenum = 2; // number of times to scale the image
-		for (int itr_scale = 1; itr_scale <= scalenum; itr_scale++)
-		{
-			// resize image
-			cv::Size dst_size(orig_bw.cols / cv::pow((double)2, itr_scale - 1), orig_bw.rows / pow((double)2, itr_scale - 1));
-			if (dst_size.height == 0)dst_size.height = 1;
-			if (dst_size.width == 0)dst_size.width = 1;
-			cv::Mat imdist_scaled;
-			resize(orig_bw, imdist_scaled, dst_size, 0, 0, cv::INTER_NEAREST);
-			imdist_scaled.convertTo(imdist_scaled, CV_64FC1, 1.0 / 255.0);
-			// calculating MSCN coefficients
-			// compute mu (local mean)
-			cv::Mat mu(imdist_scaled.size(), CV_64FC1, 1);
-			GaussianBlur(imdist_scaled, mu, cv::Size(7, 7), 1.166);
-
-			cv::Mat mu_sq;
-			cv::pow(mu, double(2.0), mu_sq);
-
-			//compute sigma (local sigma)
-			cv::Mat sigma(imdist_scaled.size(), CV_64FC1, 1);
-			cv::multiply(imdist_scaled, imdist_scaled, sigma);
-			GaussianBlur(sigma, sigma, cv::Size(7, 7), 1.166);
-
-			cv::subtract(sigma, mu_sq, sigma);
-			cv::pow(sigma, double(0.5), sigma);
-			add(sigma, cv::Scalar(1.0 / 255), sigma); // to avoid DivideByZero Error
-
-			cv::Mat structdis(imdist_scaled.size(), CV_64FC1, 1);
-			subtract(imdist_scaled, mu, structdis);
-			divide(structdis, sigma, structdis);  // =======structdis is [MSCN image]========
-
-												  // Compute AGGD fit to MSCN image
-			double lsigma_best, rsigma_best, gamma_best;
-
-			structdis = AGGDfit(structdis, lsigma_best, rsigma_best, gamma_best);
-			featurevector.push_back(gamma_best);
-			featurevector.push_back((lsigma_best*lsigma_best + rsigma_best*rsigma_best) / 2);
-
-			// Compute paired product images
-			// indices for orientations (H, V, D1, D2)
-			int shifts[4][2] = { { 0,1 },{ 1,0 },{ 1,1 },{ -1,1 } };
-			for (int itr_shift = 1; itr_shift <= 4; itr_shift++)
-			{
-				// select the shifting index from the 2D array
-				int* reqshift = shifts[itr_shift - 1];
-
-				// declare shifted_structdis as pairwise image
-				cv::Mat shifted_structdis(imdist_scaled.size(), CV_64F, 1);
-
-				// create copies of the images using BwImage constructor
-				// utility constructor for better subscript access (for pixels)
-				BwImage OrigArr(structdis);
-				BwImage ShiftArr(shifted_structdis);
-
-				// create pair-wise product for the given orientation (reqshift)
-				//TODO: ÷Æ∫Ûø…“‘”√foreachµƒlambda±Ì¥Ô Ω
-				for (int i = 0; i < structdis.rows; i++)
-				{
-					for (int j = 0; j < structdis.cols; j++)
-					{
-						if (i + reqshift[0] >= 0 && i + reqshift[0] < structdis.rows && j + reqshift[1] >= 0 && j + reqshift[1] < structdis.cols)
-						{
-							ShiftArr[i][j] = OrigArr[i + reqshift[0]][j + reqshift[1]];
-						}
-						else
-						{
-							ShiftArr[i][j] = 0;
-						}
-					}
-				}
-
-				// cv::Mat structdis_pairwise;
-				shifted_structdis = ShiftArr.equate(shifted_structdis);
-
-				// calculate the products of the pairs
-				multiply(structdis, shifted_structdis, shifted_structdis);
-
-				// fit the pairwise product to AGGD 
-				shifted_structdis = AGGDfit(shifted_structdis, lsigma_best, rsigma_best, gamma_best);
-
-				double constant = sqrt(tgamma(1 / gamma_best)) / sqrt(tgamma(3 / gamma_best));
-				double meanparam = (rsigma_best - lsigma_best)*(tgamma(2 / gamma_best) / tgamma(1 / gamma_best))*constant;
-
-				// push the calculated parameters from AGGD fit to pair-wise products
-				featurevector.push_back(gamma_best);
-				featurevector.push_back(meanparam);
-				featurevector.push_back(cv::pow(lsigma_best, 2));
-				featurevector.push_back(cv::pow(rsigma_best, 2));
-			}
-		}
-	}
-
-	// function to compute best fit parameters from AGGDfit 
-	cv::Mat AGGDfit(cv::Mat structdis, double& lsigma_best, double& rsigma_best, double& gamma_best)
-	{
-		// create a copy of an image using BwImage constructor (brisque.h - more info)
-		BwImage ImArr(structdis);
-
-		long int poscount = 0, negcount = 0;
-		double possqsum = 0, negsqsum = 0, abssum = 0;
-		for (int i = 0; i < structdis.rows; i++)
-		{
-			for (int j = 0; j < structdis.cols; j++)
-			{
-				double pt = ImArr[i][j]; // BwImage provides [][] access
-				if (pt > 0)
-				{
-					poscount++;
-					possqsum += pt*pt;
-					abssum += pt;
-				}
-				else if (pt < 0)
-				{
-					negcount++;
-					negsqsum += pt*pt;
-					abssum -= pt;
-				}
-			}
-		}
-
-		lsigma_best = cv::pow(negsqsum / negcount, 0.5);
-		rsigma_best = cv::pow(possqsum / poscount, 0.5);
-
-		double gammahat = lsigma_best / rsigma_best;
-		long int totalcount = (structdis.cols)*(structdis.rows);
-		double rhat = cv::pow(abssum / totalcount, static_cast<double>(2)) / ((negsqsum + possqsum) / totalcount);
-		double rhatnorm = rhat*(cv::pow(gammahat, 3) + 1)*(gammahat + 1) / pow(pow(gammahat, 2) + 1, 2);
-
-		double prevgamma = 0;
-		double prevdiff = 1e10;
-		float sampling = 0.001f;
-		for (float gam = 0.2f; gam < 10; gam += sampling) //possible to coarsen sampling to quicken the code, with some loss of accuracy
-		{
-			double r_gam = tgamma(2 / gam)*tgamma(2 / gam) / (tgamma(1 / gam)*tgamma(3 / gam));
-			double diff = abs(r_gam - rhatnorm);
-			if (diff > prevdiff) break;
-			prevdiff = diff;
-			prevgamma = gam;
-		}
-		gamma_best = prevgamma;
-
-		return structdis.clone();
-	}
-}
 int main(int argc, char *argv[])
 {
 #ifdef _DEBUG
@@ -409,49 +20,171 @@ int main(int argc, char *argv[])
 	cv::RNG rng(static_cast<unsigned int>(time(nullptr)));
 #endif // _DEBUG
 
+	for (auto i = 0; i < argc; i++)
+		cout << argv[i] << "   ";
+
 	if (argc > 1)
 	{
 		switch (argv[1][0])
 		{
-		case '1':
+		case '1'://ËÆ°ÁÆóBRISQUEÁâπÂæÅÂêëÈáè
 		{
-			string path = "F:\\Users\\Horizon\\Pictures\\Saved Pictures\\Crystal_";
-			int64 usedTime1 = 0, usedTime2 = 0;
+			QDir dir("d:\\Users\\yyx11\\Desktop\\Saved Pictures");
+			auto filenames = dir.entryList(
+				QStringList{ "*.png","*.jpg","*.jpeg","*.bmp" }, QDir::Files, QDir::SortFlag::Name);
+			size_t fileAmount = filenames.size();
+			cv::Mat featureMat(fileAmount,NewBrisque::BRISQUE_FEATURE_LENGTH,
+				NewBrisque::BRISQUE_MAT_TYPE,cv::Scalar(0));						
+			int64 usedTime1 = 0, usedTime2 = 0, totalTime = getTickCount();
 
-			for (auto i = 0; i < 500; i++)
+			#pragma omp parallel for//ËÆ°ÁÆóÊòØÁõ∏‰∫íÁã¨Á´ãÁöÑÔºåÂèØÁî®Âπ∂Ë°åÂ§ÑÁêÜÂä†ÈÄü
+			for (int i = 0; i < fileAmount; i++)
 			{
-				string filename = //"F:\\Users\\Horizon\\Pictures\\lovewallpaper\\2(4K) (2).jpg";
-					//"G:\\opencv\\Tool\\tid2013\\reference_images\\I05.BMP";
-				path + to_string(i) + ".png";
-				Mat img = imread(filename, IMREAD_GRAYSCALE);
-				cv::Mat feature1;
-				std::vector<double>feature2;
+				string filename = dir.absoluteFilePath(filenames[i]).toStdString();
+				Mat img = imread(filename, IMREAD_GRAYSCALE);				
+				cout << filename << "\n";
+				if (img.empty() == true)
+					continue;
 
-				cout << filename << "   ";
+				cv::Mat feature1;				
 				int64 timeBegin = cv::getTickCount();
-				Mine::ComputeBrisqueFeature(img, feature1);
+				NewBrisque::ComputeBrisqueFeature(img, feature1);
 				usedTime1 += cv::getTickCount() - timeBegin;
+				featureMat.row(i) += feature1;
 
-				timeBegin = cv::getTickCount();
-				Old::ComputeBrisqueFeature(img, feature2);
-				usedTime2 += cv::getTickCount() - timeBegin;
-				//cv::Mat e = mscn1 - mscn2;
-				cout << endl;
+//				std::vector<double>feature2;
+// 				timeBegin = cv::getTickCount();
+// 				Old::ComputeBrisqueFeature(img, feature2);
+// 				usedTime2 += cv::getTickCount() - timeBegin;
+// 				//cv::Mat e = mscn1 - mscn2;
 			}
-			cout << "time1=" << usedTime1/getTickFrequency() << endl << "time2=" << usedTime2/getTickFrequency() << endl;
 
+			totalTime = cv::getTickCount() - totalTime;
+			cout << "time1=" << usedTime1/getTickFrequency() << endl 
+				<< "time2=" << usedTime2 / getTickFrequency() << endl
+				<< "total=" << totalTime / getTickFrequency() << endl;
+			cv::imwrite(dir.absoluteFilePath("feature.exr").toStdString(), featureMat);
 		}
 		break;
+		case '2'://Ëé∑ÂæóDMOSÔºåÂÜôÂÖ•‰∏Ä‰∏™txtÊñá‰ª∂
+		{
+			QDir dir("d:\\Users\\yyx11\\Desktop\\Saved Pictures");
+			//qDebug() << dir.entryList(QStringList{ "*.png","*.jpg","*.jpeg","*.bmp" }, QDir::Files);
+			QFile f(dir.absoluteFilePath("dmos.txt"));
+			if (!f.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text))
+				break;
 
+			QTextStream ts(&f);
+			auto filenames = dir.entryList(
+				QStringList{ "*.png","*.jpg","*.jpeg","*.bmp" }, QDir::Files, QDir::SortFlag::Name);
+			ts << "length" << ',' << filenames.size() << endl
+				<< "dir" << ',' << dir.absolutePath() << endl;
+
+			for (auto filename : filenames)
+			{
+				qDebug() << filename;
+				ts << filename<<',';
+				int n = static_cast<int>(rng.uniform(0, 8));
+				for(auto i=0;i<n;i++)
+					ts << ',' << rng.uniform(0.0, 1.0);
+				ts << endl;
+			}
+		}
+		break;
+		case '3':
+		{
+			QDir dir("d:\\Users\\yyx11\\Desktop\\Saved Pictures");
+			cv::Mat featureMat, dmosMat;
+			cv::Mat featureRange;
+			std::set<int>invalidIdx;//Êó†ÊïàÊ†∑Êú¨ÔºàÊ≤°Êúâ‰∏ªËßÇËØÑÂàÜDMOSÊàñfeatureMatÊó†ÊïàÔºàÂÖ®0ÔºâÔºâ
+			
+			//DMOS
+			QFile fdmos(dir.absoluteFilePath("dmos.txt"));
+			CV_Assert(fdmos.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
+			QTextStream ts(&fdmos);
+			ts.readLine();
+			ts.readLine();
+			for(int idx=0;ts.atEnd()==false;idx++)
+			{
+				std::vector<double>mos;
+				bool b = false;
+				double avgmos = 0;
+
+				for (auto s : ts.readLine().split(','))
+				{
+					double d = s.toDouble(&b);
+					if (b)	mos.push_back(d);
+				}
+				if (mos.size() > 0)
+					avgmos = cv::mean(mos)[0];
+				else
+					invalidIdx.insert(idx);	
+
+				dmosMat.push_back(avgmos);
+			}
+			fdmos.close();
+			
+			//ÁâπÂæÅÁü©Èòµ
+			featureMat = cv::imread(dir.absoluteFilePath("feature.exr").toStdString(), IMREAD_UNCHANGED);
+			CV_Assert(featureMat.empty() == false && featureMat.cols == NewBrisque::BRISQUE_FEATURE_LENGTH);
+			for (auto i = 0; i < featureMat.rows; i++)
+				if (cv::countNonZero(featureMat.row(i) == 0))
+					invalidIdx.insert(i);
+
+			//ÂéªÊéâÊó†ÊïàÂÄº
+			cv::Mat trainData, trainLabel;
+			for (auto i = 0; i < featureMat.rows; i++)
+			{
+				if (invalidIdx.count(i) == 0)
+				{
+					trainData.push_back(featureMat.row(i));
+					trainLabel.push_back(dmosMat.row(i));
+				}
+			}
+
+			for (auto i = 0; i < featureMat.cols; i++)
+			{
+				double minValue, maxValue;
+				cv::minMaxLoc(featureMat.col(i), &minValue, &maxValue);
+				cv::normalize(featureMat.col(i), featureMat.col(i), 1, 0, cv::NORM_MINMAX);
+				featureRange.push_back(cv::Vec2d(minValue, maxValue));
+			}
+			auto psvm = cv::ml::SVM::create();
+			if (trainData.type() == CV_64F)trainData.convertTo(trainData, CV_32F);
+			if (trainLabel.type() == CV_64F)trainLabel.convertTo(trainLabel, CV_32F);
+			auto dat = cv::ml::TrainData::create(trainData, cv::ml::ROW_SAMPLE, trainLabel);
+			dat->setTrainTestSplitRatio(1 - 1.0 / 4, true);
+			//psvm->setCoef0(0.0);//
+			//psvm->setDegree(3);//
+			psvm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 1000, 1e-3));
+			//psvm->setGamma(0.5);
+			psvm->setKernel(cv::ml::SVM::RBF);
+			//psvm->setNu(0.5);//
+			psvm->setP(0.5); // for EPSILON_SVR, epsilon in loss function?[Êú™ÂÆö]
+							 //psvm->setC(1024); // From paper, soft classifier
+			psvm->setType(cv::ml::SVM::EPS_SVR); // C_SVC; // EPSILON_SVR; // may be also NU_SVR; // do regression task
+												 //	psvm->train(trainData, cv::ml::ROW_SAMPLE, trainLabel);
+												 //psvm->trainAuto(trainData, cv::ml::ROW_SAMPLE, trainLabel);
+												 //ÈªòËÆ§ÂèÇÊï∞C=[0.1,500,5],GAMMA=[1e-5,0.6,15],P=[0.01,100,7]„ÄÇÂèÇÊï∞Êª°Ë∂≥minVal‚àólogStep^n<maxVal
+			psvm->trainAuto(dat, 4, ml::ParamGrid(0.1, 100, 1.1), ml::ParamGrid(1e-5, 0.8, 2), ml::ParamGrid(0.01, 0.5, 2));//C,GAMMA,P„ÄêPÂøÖÈ°ª<1Âê¶ÂàôÊâæ‰∏çÂà∞ÊîØÊåÅÂêëÈáè„Äë
+ 			psvm->save(dir.absoluteFilePath("svm_model.txt").toStdString());
+			cout << "<<<ËÆ≠ÁªÉÂÆåÊàê>>>" << endl
+				<< "\tC=" << psvm->getC() << endl << "\tGamma=" << psvm->getGamma() << endl << "\tP=" << psvm->getP() << endl;
+			cout << "error=" << psvm->calcError(dat, false, noArray()) << endl;
+		}
+		break;
 		default:
 			break;
 		}
 	}
 	else
 	{
-		cout << "≤Ÿ◊˜£∫\n"
-			"1.÷ÿ–¥BRISQUE\n"
-			"~.ÕÀ≥ˆ\n" << endl;
+		cout << "Êìç‰ΩúÔºö\n"
+			"1.ËÆ°ÁÆóBRISQUEÁâπÂæÅÂêëÈáè\n"
+			"2.Ëé∑ÂæóDMOS\n"
+			"3.ËÆ≠ÁªÉBRISQUE\n"
+			"4.È¢ÑÊµãBRISQUE\n"
+			"~.ÈÄÄÂá∫\n" << endl;
 	}
 	system("pause");
 	return 0;
