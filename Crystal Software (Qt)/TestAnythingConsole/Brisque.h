@@ -187,19 +187,7 @@ namespace NewBrisque
 		featureVector.convertTo(featureVector, BRISQUE_MAT_TYPE);
 		assert(featureVector.total() == BRISQUE_FEATURE_LENGTH);
 	}
-	class Brisque
-	{
-	public:
-		Brisque();
-		Brisque(std::string modelPath, std::string rangePath);
-		Brisque(cv::Ptr<cv::ml::SVM>model, cv::Mat range);
 
-		bool train(cv::Mat featureMat, cv::Mat labelMat);
-		double computeScore(cv::Mat image);
-	private:
-		cv::Ptr<cv::ml::SVM>_svmModel;
-		cv::Mat _rangeModel;
-	};
 	//void NormalizeBrisqueFeatureArray()
 }
 namespace OldBrisque
