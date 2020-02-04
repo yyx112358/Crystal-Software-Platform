@@ -113,7 +113,7 @@ namespace NewBrisque
 	}
 
 	//计算BRISQUE特征向量（输出BRISQUE_MAT_TYPE类型行向量）
-	void ComputeBrisqueFeature(const cv::Mat& orig, cv::Mat& featureVector)
+	cv::Mat ComputeBrisqueFeature(const cv::Mat& orig)
 	{
 		cv::Mat orig_bw;
 		// convert to grayscale 
@@ -126,7 +126,7 @@ namespace NewBrisque
 			orig_bw.convertTo(orig_bw, BRISQUE_MAT_TYPE);
 
 		// orig_bw now contains the grayscale image normalized to the range 0,1
-		featureVector = cv::Mat(cv::Size(0, 0), BRISQUE_MAT_TYPE);
+		cv::Mat featureVector = cv::Mat(cv::Size(0, 0), BRISQUE_MAT_TYPE);
 		int scalenum = 2; // number of times to scale the image
 		for (int itr_scale = 1; itr_scale <= scalenum; itr_scale++)
 		{
@@ -186,10 +186,12 @@ namespace NewBrisque
 		featureVector = featureVector.reshape(1, 1);//变换为行向量
 		featureVector.convertTo(featureVector, BRISQUE_MAT_TYPE);
 		assert(featureVector.total() == BRISQUE_FEATURE_LENGTH);
+		return featureVector;
 	}
 
 	//void NormalizeBrisqueFeatureArray()
 }
+/*
 namespace OldBrisque
 {
 	template<class T> class Image
@@ -384,4 +386,4 @@ namespace OldBrisque
 
 		return structdis.clone();
 	}
-}
+}*/
