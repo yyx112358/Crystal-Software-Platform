@@ -6,285 +6,17 @@
 #include <set>
 
 #include "Brisque.h"
+#include "Crystal.h"
 
 using namespace std;
-using namespace NewBrisque;
-//using namespace OldBrisque;
 
-//	无参考图像质量评估算法：Brisque
-class Brisque
-{
-public:
-	Brisque() {}
+//遍历paths，展开文件名【不检查文件有效性，不递归搜索】
+//如果是文件夹，则搜索其下的支持的图像文件("*.png","*.jpg","*.jpeg","*.bmp")并加入【不含子文件夹】
+//txt文件，则按行展开,每一行被认定为一个文件的路径并加入
+//其它类型则直接加入
+QStringList ExpandFilenames(QStringList paths);
 
-	int RunCommand(int argc, char*argv[]);
 
-	bool Load(std::string settingPath);
-	bool Save(std::string settingPath = ".\\brisque.json",
-		std::string modelPath=".\\brisque_model.json")const;
-	void Clear();
-	
-	//使用featureMat和dmosMat训练，该函数假设数据全部有效
-	bool Train(const cv::Mat& featureMat, const cv::Mat& dmosMat);
-	//使用存档的feature和dmos训练
-	//feature为exr文件，32位浮点
-	//dmos为csv文本文件，每一行一个样本，存放：路径，评分
-	bool Train(std::string featurePath,std::string dmosPath);
-	
-	cv::Mat Predict(cv::InputArray img)const;
-	//TODO:cv::Mat Predict(CrystalSet cs)const;
-	cv::Mat Predict(std::string filename)const;
-
-	cv::Mat CalcFeature(std::vector<string> paths);
-
-	bool isDisplay = true;
-	bool isTrained()const { return psvm.empty() == false && psvm->isTrained() == true; }
-
-	static double Alg_SROCC();
-	static cv::Mat Alg_ExtractFeature(cv::Mat);
-
-	cv::Ptr<cv::ml::SVM> psvm;
-	std::vector<double> lowerRange, upperRange;
-	std::string feature_path;
-	std::string dmos_path;
-private:
-};
-
-bool Brisque::Load(std::string settingPath)
-{
-	try
-	{
-		Clear();
-		cv::FileStorage fs(settingPath, cv::FileStorage::FORMAT_AUTO | cv::FileStorage::READ);
-		CV_Assert(fs.isOpened() == true 
-			&& fs["model_path"].empty() == false && fs["is_trained"].empty() == false
-			&& fs["lower_range"].empty() == false && fs["upper_range"].empty() == false);
-		
-		psvm = cv::ml::SVM::load(fs["model_path"].string());
-		std::cout << fs["model_path"].string() << endl;
-
-		bool is_trained = false;
-		fs["is_trained"] >> is_trained;
-		is_trained &= psvm->isTrained();
-		CV_Assert(is_trained == true);
-
-		fs["lower_range"] >> lowerRange;
-		fs["upper_range"] >> upperRange;
-
-		return true;
-	}
-	catch (cv::Exception &e)
-	{
-		Clear();
-		return false;
-	}
-}
-
-bool Brisque::Save(std::string settingPath /*= ".\\brisque.json"*/, std::string modelPath/*=".\\brisque_model.json"*/) const
-{
-	try
-	{
-		cv::FileStorage fs(settingPath, cv::FileStorage::WRITE);
-
-		CV_Assert(lowerRange.size() > 0 && lowerRange.size() == upperRange.size());
-		fs << "lower_range" << lowerRange;
-		fs << "upper_range" << upperRange;
-
-		CV_Assert(isTrained() == true);
-		CV_Assert(psvm->getVarCount() == lowerRange.size());		
-		psvm->save(modelPath);
-		fs << "model_path" << modelPath;
-		fs << "is_trained" << isTrained();
-
-		if (feature_path.empty() == false)
-			fs << "feature_path" << feature_path;
-		if (dmos_path.empty() == false)
-			fs << "dmos_path" << dmos_path;
-
-		return true;
-	}
-	catch (cv::Exception& e)
-	{
-		return false;
-	}
-}
-
-void Brisque::Clear()
-{
-	if (psvm.empty() == false) 
-		psvm->clear(); 
-	lowerRange.clear();
-	upperRange.clear();
-}
-
-bool Brisque::Train(const cv::Mat& featureMat, const cv::Mat& dmosMat)
-{
-	try
-	{
-		CV_Assert(featureMat.empty() == false
-			&& featureMat.rows == dmosMat.rows);
-
-		//归一化
-		for (auto i = 0; i < featureMat.cols; i++)
-		{
-			double minValue, maxValue;
-			cv::minMaxLoc(featureMat.col(i), &minValue, &maxValue);
-			cv::normalize(featureMat.col(i), featureMat.col(i), 1, 0, cv::NORM_MINMAX);
-			lowerRange.push_back(minValue);
-			upperRange.push_back(maxValue);
-		}
-
-		//准备数据
-		cv::Mat trainData, trainLabel;
-		psvm = cv::ml::SVM::create();
-		featureMat.convertTo(trainData, CV_32F);
-		dmosMat.convertTo(trainLabel, CV_32F);
-		auto dat = cv::ml::TrainData::create(trainData, cv::ml::ROW_SAMPLE, trainLabel);
-		dat->setTrainTestSplitRatio(1 - 1.0 / 4, true);
-
-		psvm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER + cv::TermCriteria::EPS,
-#ifdef _DEBUG
-10
-#else
-			1000
-#endif // _DEBUG
-, 1e-3));
-		psvm->setKernel(cv::ml::SVM::RBF);
-		psvm->setP(0.5); // for EPSILON_SVR, epsilon in loss function?[未定]
-						 //psvm->setC(1024); // From paper, soft classifier
-		psvm->setType(cv::ml::SVM::EPS_SVR); // C_SVC; // EPSILON_SVR; // may be also NU_SVR; // do regression task
-											 
-		//默认参数C=[0.1,500,5],GAMMA=[1e-5,0.6,15],P=[0.01,100,7]。参数满足minVal∗logStep^n<maxVal
-		//训练
-		psvm->trainAuto(dat, 4, cv::ml::ParamGrid(0.1, 100, 1.1), cv::ml::ParamGrid(1e-5, 0.8, 2),
-			cv::ml::ParamGrid(0.01, 0.5, 2));//C,GAMMA,P【P必须<1否则找不到支持向量】
-		if (isDisplay)
-		{
-			std::cout << "<<<训练完成>>>" << endl
-				<< "\tC=" << psvm->getC() << endl << "\tGamma=" << psvm->getGamma() << endl << "\tP=" << psvm->getP() << endl;
-			std::cout << "error=" << psvm->calcError(dat, false, cv::noArray()) << endl;
-		}
-
-		return true;
-	}
-	catch (cv::Exception&e)
-	{
-		Clear();
-		return false;
-	}
-}
-
-bool Brisque::Train(std::string featurePath, std::string dmosPath)
-{
-	try
-	{
-		cv::Mat featureMat, dmosMat;
-		cv::Mat featureRange;
-		std::set<int>invalidIdx;//无效样本（没有主观评分DMOS或featureMat无效（全0））
-
-		//DMOS
-		QFile f(QString::fromStdString(dmosPath));
-		CV_Assert(f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
-		QTextStream ts(&f);
-		ts.readLine();
-		ts.readLine();
-		for (int idx = 0; ts.atEnd() == false; idx++)
-		{
-			std::vector<double>mos;
-			bool b = false;
-			double avgmos = 0;
-
-			for (auto s : ts.readLine().split(','))
-			{
-				double d = s.toDouble(&b);
-				if (b)	mos.push_back(d);
-			}
-			if (mos.size() > 0)
-				avgmos = cv::mean(mos)[0];
-			else
-				invalidIdx.insert(idx);
-
-			dmosMat.push_back(avgmos);
-		}
-		f.close();
-
-		//特征矩阵
-		featureMat = cv::imread(featurePath, cv::IMREAD_UNCHANGED);
-		CV_Assert(featureMat.empty() == false && featureMat.cols == NewBrisque::BRISQUE_FEATURE_LENGTH);
-		for (auto i = 0; i < featureMat.rows; i++)
-			if (cv::countNonZero(featureMat.row(i) == 0))
-				invalidIdx.insert(i);
-
-		//去掉无效值
-		cv::Mat trainData, trainLabel;
-		for (auto i = 0; i < featureMat.rows; i++)
-		{
-			if (invalidIdx.count(i) == 0)
-			{
-				trainData.push_back(featureMat.row(i));
-				trainLabel.push_back(dmosMat.row(i));
-			}
-		}
-
-		return Train(trainData, trainLabel);
-	}
-	catch (cv::Exception&e)
-	{
-		Clear();
-		return false;
-	}
-}
-
-cv::Mat Brisque::Predict(cv::InputArray src) const
-{
-	cv::Mat result;
-	try
-	{
-		CV_Assert(isTrained());
-		std::vector<cv::Mat>imgs;
-		switch (src.kind())
-		{
-		case cv::_InputArray::MAT:
-		case cv::_InputArray::MATX:
-		case cv::_InputArray::UMAT:
-		case cv::_InputArray::EXPR:
-			imgs.push_back(src.getMat());
-			break;
-		case cv::_InputArray::STD_VECTOR_MAT:
-		case cv::_InputArray::STD_ARRAY_MAT:
-			src.getMatVector(imgs);
-			break;
-		default:
-			break;
-		}		
-		for (auto img : imgs)
-			result.push_back(psvm->predict(NewBrisque::ComputeBrisqueFeature(img)));
-	}
-	catch (cv::Exception &e)
-	{
-	}
-	return result;
-}
-
-cv::Mat Brisque::Predict(std::string filename) const
-{
-	cv::Mat result;
-	try
-	{
-		std::string suffix = filename.substr(filename.find_last_of('.'), 1);
-
-		if (suffix == "xml" || suffix == "yaml" || suffix == "json")//是CrystalSet形式
-		{
-			CV_Assert(!(suffix == "xml" || suffix == "yaml" || suffix == "json"));
-		}
-		else
-			result = Predict(cv::imread(filename, cv::IMREAD_GRAYSCALE));
-	}
-	catch (cv::Exception& e)
-	{
-	}
-	return result;
-}
 
 int main(int argc, char *argv[])
 {
@@ -315,7 +47,7 @@ int main(int argc, char *argv[])
 			setting = QString::fromStdString(parser.get<std::string>("@setting")),
 			input = QString::fromStdString(parser.get<std::string>("@input")),
 			output = QString::fromStdString(parser.get<std::string>("@output"));
-		//int displayLevel = parser.get<int>("@input");
+		int displayLevel = parser.get<int>("display");
 		if (parser.check() == false)
 		{
 			parser.printErrors();
@@ -324,59 +56,61 @@ int main(int argc, char *argv[])
 		if (mode == "1" || mode == "train")
 		{
 
+// 			QFile fpath(input.split(',')[0]),finfo(input.split(',')[1]),fout(output);
+// 			CV_Assert(fpath.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text) == true
+// 				&& finfo.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text) == true
+// 				&& fout.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text) == true);
+// 			
+// 			QTextStream tspath(&fpath), tsinfo(&finfo);
+// 			QDataStream ()
+			//train 1 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" ""
+			CrystalSetManager manager;
+			manager.Load(input.toStdString());
+			
 		}
-		else if (mode == "2" || mode == "generate")
+		else if (mode == "2" || mode == "generate")//训练集生成模式
 		{
+			bool generateModeAmountParseSuccess = false;
+			size_t amount = setting.toInt(&generateModeAmountParseSuccess);
+			CV_Assert(generateModeAmountParseSuccess == true);
+			//=====添加待处理文件名=====
+			QStringList blocks = input.split(',');
+			if (input.isEmpty())//空则默认为当前目录
+				blocks.append(".");
+			QStringList filenames = ExpandFilenames(blocks);
+			//TODO:检查有效性，展开CrystalSet
 
+			std::vector<int>selectIdxs;
+			rng.fill(selectIdxs, cv::RNG::UNIFORM, cv::Scalar(0), cv::Scalar(filenames.size()));
+
+			//std::sort(selectIdxs.begin(), selectIdxs.end());
+			//TODO:将文件随机抽取复制到output，并生成空白brisque_dmos.txt
+		}
+		else if (mode == "3" || mode == "update")
+		{
+			//update csv "d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Image_Path_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Info_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\fig_batch1" "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset"
+			CrystalSetManager::UpdateCSV(input.split(',')[0].toStdString(),
+				input.split(',')[1].toStdString(), output.toStdString(), 
+				input.split(',')[2].toStdString());
 		}
 		else//预测模式
 		{			
 			//=====加载模型和命令行=====
+			//predict "d:\Users\yyx11\Desktop\Saved Pictures\brisque.json" "d:\Users\yyx11\Desktop\Saved Pictures\Crystal_   0.png","d:\Users\yyx11\Desktop\Saved Pictures\Crystal_   1.png","d:\Users\yyx11\Desktop\Saved Pictures\FileNames.txt","d:\Users\yyx11\Desktop\Saved Pictures"  "d:\Users\yyx11\Desktop\Saved Pictures\result.txt"
 			Brisque brisque;
 			CV_Assert(brisque.Load(setting.toStdString()) == true);
-			QStringList blocks=input.split(',');
-			if (input.isEmpty())//空则默认为当前目录
-				blocks.append(".");
 
 			//=====添加待处理文件名=====
-			QStringList filenames;
-			for (auto block : blocks)
-			{
-				QFileInfo fileInfo(block);
-				if (fileInfo.isDir())//目录，遍历给定目录下所有支持图片(jpg,png,bmp,jpeg)
-				{
-					QDir dir(fileInfo.filePath());
-					auto result = dir.entryList(
-						QStringList{ "*.png","*.jpg","*.jpeg","*.bmp", },
-						QDir::Files, QDir::SortFlag::Name);
-					qDebug() << QStringLiteral("文件夹:") << fileInfo.filePath() << endl 
-						<< QStringLiteral("总数:") << result.size();
-					for (auto &r : result)
-						r = dir.filePath(r);
-					filenames.append(result);
-				}
-				else if (fileInfo.isFile() && fileInfo.suffix().toLower() == "txt")//txt，txt则按行遍历其中所有文件名
-				{
-					QFile f(block);
-					if (!f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text))
-						continue;
-					QTextStream ts(&f);
-					while (ts.atEnd() == false)
-					{
-						auto line = ts.readLine();
-						if (line.isEmpty() == false)
-							filenames.append(ts.readLine());
-					}
-				}
-				else//其余情况直接加入filenames（引号会被命令行程序自动去掉）
-					filenames.append(block);
-			}
+			QStringList blocks = input.split(',');
+			if (input.isEmpty())//空则默认为当前目录
+				blocks.append(".");
+			QStringList filenames = ExpandFilenames(blocks);			
 
 			//=====计算结果=====
 			size_t fileAmount = filenames.size();
 			QStringList results;//计算结果，图片则结果为浮点数
 			for (auto i = 0; i < fileAmount; i++)results.append("");
-			int64 usedTime1 = 0, totalTime = cv::getTickCount();
+			std::atomic_int64_t usedTime1 = 0, totalTime = cv::getTickCount();
 #ifndef _DEBUG
 			#pragma omp parallel for//计算是相互独立的，可用并行处理加速
 #endif // _DEBUG
@@ -388,7 +122,7 @@ int main(int argc, char *argv[])
 				if (img.empty() == false) 
 				{
 					auto result = brisque.Predict(img);
-					results[i] = QString::number(result.at<NewBrisque::BRISQUE_ELEMENT_TYPE>(0));
+					results[i] = QString::number(result.at<BRISQUE_ELEMENT_TYPE>(0));
 					usedTime1 += cv::getTickCount() - timeBegin;
 					qDebug() << filename << "\t" << results[i] << "\t"
 						<< (cv::getTickCount() - timeBegin) * 1000 / cv::getTickFrequency() << "ms" << endl;
@@ -627,4 +361,60 @@ int main(int argc, char *argv[])
 // 	}
 
 }
-
+QStringList ExpandFilenames(QStringList paths)
+{
+	QStringList filenames;
+	for (auto path : paths)
+	{
+		QFileInfo fileInfo(path);
+		if (fileInfo.isDir())//目录，遍历给定目录下所有支持图片(jpg,png,bmp,jpeg)
+		{
+			QDir dir(fileInfo.filePath());
+			auto result = dir.entryList(
+				QStringList{ "*.png","*.jpg","*.jpeg","*.bmp", },
+				QDir::Files, QDir::SortFlag::Name);
+			qDebug() << QStringLiteral("文件夹:") << fileInfo.filePath() << endl
+				<< QStringLiteral("总数:") << result.size();
+			for (auto &r : result)
+				r = dir.filePath(r);
+			filenames.append(result);
+		}
+		else if (fileInfo.isFile() && fileInfo.suffix().toLower() == "txt")//txt，txt则按行遍历其中所有文件名
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text))
+				continue;
+			QTextStream ts(&f);
+			while (ts.atEnd() == false)
+			{
+				auto line = ts.readLine();
+				if (line.isEmpty() == false)
+					filenames.append(ts.readLine());
+			}
+		}
+		else//其余情况直接加入filenames（引号会被命令行程序自动去掉）
+			filenames.append(path);
+	}
+	return filenames;
+}
+class SavePredictResultAtClose
+{
+public:
+	SavePredictResultAtClose(QString outPath, const QStringList&filenames, const QStringList&results)
+		:outPath(outPath), filenames(filenames), results(results)
+	{}
+	~SavePredictResultAtClose()
+	{
+		if (outPath.isEmpty() == false)
+		{
+			QFile f(outPath);
+			CV_Assert(f.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text));
+			QTextStream ts(&f);
+			for (auto i = 0; i < filenames.size(); i++)
+				ts << filenames[i] << ',' << results[i] << endl;
+		}
+	}
+	QString outPath;
+	const QStringList&filenames;
+	const QStringList&results;
+};
