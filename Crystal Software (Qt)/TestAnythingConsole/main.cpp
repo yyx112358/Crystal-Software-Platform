@@ -66,7 +66,8 @@ int main(int argc, char *argv[])
 			//train 1 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" ""
 			CrystalSetManager manager;
 			manager.Load(input.toStdString());
-			
+			std::vector<CommonCrystalSet>vccs;
+			vccs = manager.Read(0);
 		}
 		else if (mode == "2" || mode == "generate")//训练集生成模式
 		{

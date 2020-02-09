@@ -43,7 +43,7 @@ char* myGetCommaSegment(FILE*f, char*buf)
 {
 	auto i = 0u;
 	char c = '\0';
-	while (c != '\n'&&c != ','&&feof(f) == 0)
+	while (c != ','&&c != '\n'&&feof(f) == 0)
 	{
 		fread(&c, 1, 1, f);
 		buf[i++] = c;
@@ -51,6 +51,7 @@ char* myGetCommaSegment(FILE*f, char*buf)
 	buf[i-1] = '\0';
 	return buf;
 }
+
 
 bool CrystalSetManager::Load(std::string path)
 {
@@ -95,11 +96,104 @@ bool CrystalSetManager::Load(std::string path)
 std::vector<CommonCrystalSet> CrystalSetManager::Read(size_t begin, size_t end /*= 999999999*/)
 {
 	std::vector<CommonCrystalSet>vccs;
-	if (f == nullptr)
+	if (f == nullptr || begin >= size() || begin >= end)//左闭右开区间
 		return vccs;
+	if (end > _searchTbl.size())end = size();
 
+	//TODO:超大文件拆分和并行化
+	Seek(begin);
+	for (auto i = begin; i < end; i++)
+		vccs.push_back(Get());
 	return vccs;
 }
+//从buf+offset开始读取，直到遇到下一个','或'\n'
+//修改','或'\n'为'\0'，返回这一个段的开头，buf+offset将被指向下一个段开头
+//使用该函数可以简化csv文件的读取，每调用一次atoi(myGetCommaSegment(buf,offset);即可读取一个数字，参考Get()
+char* myGetCommaSegment(char*buf,size_t&offset)
+{
+	auto begin = offset;
+	char c;
+	do 
+	{
+		c = buf[offset++];
+	} while (c != ','&&c != '\n');
+	buf[offset - 1] = '\0';
+	return buf + begin;
+}
+CommonCrystalSet CrystalSetManager::Get()
+{
+	CV_Assert(IsEnd() == false && IsOpen() == true && ftell(f) == _searchTbl[_nodeIdx]);
+	
+	char buf[0xFFFF];
+	auto length = 0;
+	if (_nodeIdx + 1 < size())
+		length = _searchTbl[_nodeIdx + 1] - _searchTbl[_nodeIdx];
+	else
+	{
+		fseek(f, 0, SEEK_END);
+		length = ftell(f) - _searchTbl[_nodeIdx];
+		fseek(f, _searchTbl[_nodeIdx], SEEK_SET);
+	}
+	buf[fread(buf, 1, length, f)] = '\0';
+	_nodeIdx++;
+
+	//下一集合指针（9位），上一集合指针（9位），集合序号，晶体个数，保留，保留，文件名（不含文件夹）
+	size_t offset = 0;
+	myGetCommaSegment(buf, offset);
+	myGetCommaSegment(buf, offset);
+	auto nodeIdx = atoi(myGetCommaSegment(buf, offset));
+	
+	auto crystalAmount = atoi(myGetCommaSegment(buf, offset));
+
+	CommonCrystalSet ccs(_dir + std::string(myGetCommaSegment(buf, offset)));
+	ccs._crystals.reserve(crystalAmount);
+	contour_t ct;
+	cv::Point pt;
+	for (auto oldoffset = offset,commacnt=0ull; offset < length; offset++)
+	{
+		char c = buf[offset];
+		if (c == ',')
+		{
+			buf[offset] = '\0';
+			commacnt++;
+			if (commacnt % 2 == 1)
+				pt.x = atoi(buf + oldoffset);
+			else 
+			{
+				pt.y = atoi(buf + oldoffset);
+				ct.push_back(pt);
+			}
+			oldoffset = offset+1;
+		}
+		else if (c == '\n')
+		{
+			buf[offset] = '\0';
+			commacnt = 0;
+			ccs._crystals.push_back(Crystal(ccs._originImage, std::move(ct)));
+// 			contour_t tmp; tmp.swap(ct);
+// 			ccs.PushBack(tmp, false);
+			oldoffset = offset+1;
+		}
+	}
+	if (nodeIdx % 100 == 0)
+		cout << nodeIdx << "    " << crystalAmount << endl;
+	CV_Assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
+
+	return ccs;
+}
+
+bool CrystalSetManager::Seek(size_t idx)
+{
+	if (IsEnd() == false && IsOpen() == true)
+	{
+		_nodeIdx = idx;
+		fseek(f, _searchTbl[idx], SEEK_SET);
+		return true;
+	}
+	else
+		return false;
+}
+
 /*
 格式：
 第一行：<Crystal Set Text>
@@ -153,7 +247,7 @@ bool CrystalSetManager::SaveAll(const std::vector<CommonCrystalSet>&vccs, std::s
 		//此时长度信息已知，重新修改fptr
 		fptr += cnt;
 		char fptrbuf[FPTR_WIDTH+1];
-		sprintf_s<sizeof(fptrbuf)>(fptrbuf, "%9zd", fptr);
+		sprintf_s<sizeof(fptrbuf)>(fptrbuf, "%9d", fptr);
 		memcpy(buf, fptrbuf, FPTR_WIDTH);
 		fwrite(buf, 1, cnt, f);
 	}

@@ -18,6 +18,8 @@ public:
 	Crystal(const cv::Mat& image, const contour_t& in_contour);
 	Crystal(std::shared_ptr<cv::Mat>originImage, const contour_t& in_contour)
 		:_contour(in_contour), _originImage(originImage) {}
+	Crystal(std::shared_ptr<cv::Mat>originImage, contour_t&& in_contour)
+		:_contour(std::move(in_contour)), _originImage(originImage) {}
 	Crystal(const Crystal&src)
 		:_contour(src._contour), _originRegion(src._originRegion), _originImage(src._originImage){}
 	Crystal(const Crystal&&src)
@@ -40,6 +42,8 @@ private:
 class CommonCrystalSet
 {
 public:
+	friend class CrystalSetManager;
+
 	CommonCrystalSet(std::string inputPath) :_imgPath(inputPath) {}
 	CommonCrystalSet(cv::Mat originImg,std::string outputPath="");
 	CommonCrystalSet(CommonCrystalSet&& another)
@@ -50,8 +54,9 @@ public:
 	size_t size()const { return _crystals.size(); }
 	Crystal&operator[](int id);
 
+	contour_t& GetContour(int id) { return _crystals[id].Contour(); }
 	const contour_t& GetContour(int id)const { return _crystals[id].Contour(); }
-	void PushBack(contour_t ct ,bool isLoadImage=true) { _crystals.push_back(Crystal(_originImage, ct)); }
+	void PushBack(const contour_t& ct ,bool isLoadImage=true) { _crystals.push_back(Crystal(_originImage, ct)); }
 
 	std::shared_ptr<cv::Mat> OriginImg();
 	void ReleaseImg() { if(_originImage) _originImage->release(); }
@@ -65,7 +70,7 @@ protected:
 #include <stdio.h>
 //基本思想：文本文件，顺序读写，末尾插入，按行处理，逗号分隔，链式连接
 //	不追求极致性能优化，string等随意使用。预计规模30000图片，100 0000晶体，约100M文本文件
-//	原则上，这个类是只读的。而static函数Save()和Update()负责写
+//	原则上，这个类是只读的。而static函数Save()和Update()负责写。不建议多线程操作，既不安全，也不效率
 class CrystalSetManager
 {
 public:
@@ -74,16 +79,16 @@ public:
 
 	bool Load(std::string path);
 	void Clear() {
-		_dir.clear(); _searchTbl.clear(); version = 0; if (f) fclose(f);
+		_dir.clear(); _searchTbl.clear(); version = 0; if (IsOpen()) fclose(f);
 		fptr = 0; next_fptr = 0; _nodeIdx = 0;
 	}
 
 	std::vector<CommonCrystalSet>Read(size_t begin, size_t end = 999999999);
+	std::vector<CommonCrystalSet>Read(std::function<bool(const CommonCrystalSet&)>filterFunction,
+		size_t begin, size_t end = 999999999);
 	CommonCrystalSet Get();//获取一个节点，并将指针移到下一个节点
-	CommonCrystalSet Get(size_t idx);
-	bool Seek();//将指针移到下一个节点
 	bool Seek(size_t idx);//将指针移到第idx个节点，不反序列化
-	size_t Pos()const;
+
 
 	static bool SaveAll(const std::vector<CommonCrystalSet>&vccs, std::string filename,
 		std::string dir ="", size_t begin = 0, size_t end = 999999999);
@@ -94,13 +99,19 @@ public:
 	static bool Update(std::string oldpath);
 	static bool UpdateCSV(std::string pathfile, std::string infofile, std::string outfile,std::string dir);
 
-	std::string _dir;
-	std::vector<size_t>_searchTbl;
+	size_t Pos() const { return _nodeIdx; }
+	bool IsOpen()const { return f != nullptr; }
+	bool IsEnd()const { return _nodeIdx >= size(); }
+	size_t size()const { return _searchTbl.size(); }
 
 	const static uint32_t PROGRAM_VERSION;
-	const static size_t FPTR_WIDTH;
-	uint32_t version;
+	const static size_t FPTR_WIDTH;	
 private:
+	uint32_t version;
+
+	std::string _dir;
+	std::vector<size_t>_searchTbl;//查找表，用于快速索引
+
 	FILE*f = nullptr;//打开的文件
 	size_t fptr = 0, next_fptr = 0;//用于遍历的文件指针
 	size_t _nodeIdx = 0;
