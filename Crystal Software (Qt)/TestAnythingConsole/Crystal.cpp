@@ -30,11 +30,11 @@ const size_t CrystalSetManager::FPTR_WIDTH = 9;
 int myitoa(unsigned long num, char*buf)
 {
 	auto oldbuf = buf;
-	while (num > 0) 
+	do
 	{
 		*buf++ = num % 10 + '0';
 		num /= 10;
-	}
+	} while (num > 0);
 	reverse(oldbuf, buf);
 	return buf - oldbuf;
 }
@@ -151,33 +151,50 @@ CommonCrystalSet CrystalSetManager::Get()
 	cv::Point pt;
 	for (auto oldoffset = offset,commacnt=0ull; offset < length; offset++)
 	{
-		char c = buf[offset];
-		if (c == ',')
+		//最昂贵的操作是ct的内存分配，因此预先读取逗号个数从而预先分配可大大减少时间
+		commacnt = 0;
+		char c;
+		while (offset < length && (c = buf[offset++]) != '\n')
+			if (c == ',')
+				commacnt++;
+		ct.reserve((commacnt + 1) / 2);
+		offset = oldoffset;
+
+		for (auto i = 0; i < (commacnt + 1) / 2; i++)
 		{
-			buf[offset] = '\0';
-			commacnt++;
-			if (commacnt % 2 == 1)
-				pt.x = atoi(buf + oldoffset);
-			else 
-			{
-				pt.y = atoi(buf + oldoffset);
-				ct.push_back(pt);
-			}
-			oldoffset = offset+1;
+			pt.x = atoi(myGetCommaSegment(buf, offset));
+			pt.y = atoi(myGetCommaSegment(buf, offset));
+			ct.push_back(pt);
 		}
-		else if (c == '\n')
-		{
-			buf[offset] = '\0';
-			commacnt = 0;
-			ccs._crystals.push_back(Crystal(ccs._originImage, std::move(ct)));
-// 			contour_t tmp; tmp.swap(ct);
-// 			ccs.PushBack(tmp, false);
-			oldoffset = offset+1;
-		}
+		ccs._crystals.push_back(Crystal(ccs._originImage, std::move(ct)));//右值引用减少内存重分配
+		oldoffset = offset;
+// 		char c = buf[offset];
+// 		if (c == ',')
+// 		{
+// 			buf[offset] = '\0';
+// 			commacnt++;
+// 			if (commacnt % 2 == 1)
+// 				pt.x = atoi(buf + oldoffset);
+// 			else 
+// 			{
+// 				pt.y = atoi(buf + oldoffset);
+// 				ct.push_back(pt);//这里的频繁内存重分配是影响速度的一大因素，因此在后面加入reserve和shrink_to_fit
+// 			}
+// 			oldoffset = offset+1;
+// 		}
+// 		else if (c == '\n')
+// 		{
+// 			buf[offset] = '\0';
+// 			commacnt = 0;
+// 			ccs._crystals.push_back(Crystal(ccs._originImage, std::move(ct)));
+// // 			contour_t tmp; tmp.swap(ct);
+// // 			ccs.PushBack(tmp, false);
+// 			oldoffset = offset+1;
+// 		}
 	}
 	if (nodeIdx % 100 == 0)
 		cout << nodeIdx << "    " << crystalAmount << endl;
-	CV_Assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
+	assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
 
 	return ccs;
 }
@@ -222,11 +239,11 @@ bool CrystalSetManager::SaveAll(const std::vector<CommonCrystalSet>&vccs, std::s
 		CrystalSetManager::PROGRAM_VERSION, dir.c_str(), vccs.size());
 	//写入数据
 	fptr = ftell(f);
-	for (auto i=begin;i<vccs.size()&&i<end;i++)
+	for (auto i = begin; i < vccs.size() && i < end; i++)
 	{
 		const auto &ccs = vccs[i];
 		//写入CommonCrystalSet信息，注意这里的fptr（指向下一个节点起始位置）还不正确，因为此时本节点长度未知
-		auto cnt = sprintf_s<sizeof(buf)>(buf, "%9d,%9d,%9d,%4zd,%s\n", fptr, prev_fptr, i, 
+		auto cnt = sprintf_s<sizeof(buf)>(buf, "%9d,%9d,%9zd,%4zd,%s\n", fptr, prev_fptr, i, 
 			ccs.size(), ccs.path().c_str());
 		prev_fptr = fptr;
 		for (auto j = 0u; j < ccs.size(); j++)
