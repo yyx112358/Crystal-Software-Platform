@@ -14,6 +14,8 @@ typedef std::vector<cv::Point>contour_t;
 class Crystal
 {
 public:
+	friend class CommonCrystalSet;
+
 	Crystal(){}
 	Crystal(const cv::Mat& image, const contour_t& in_contour);
 	Crystal(std::shared_ptr<cv::Mat>originImage, const contour_t& in_contour)
@@ -29,11 +31,17 @@ public:
 	cv::Rect Region();
 	contour_t& Contour() { return _contour; }
 	const contour_t& Contour()const { return _contour; }
-	cv::Mat Image() { return (*_originImage)(Region()); }//晶体的原始图像
+	cv::Mat Image() 
+	{ 
+		if (_originImage.lock() != nullptr)
+			return (*_originImage.lock())(Region());
+		else
+			return cv::Mat();
+	}//晶体的原始图像
 private:
 	cv::Rect _originRegion = cv::Rect(0, 0, -1, -1);//在原始图像中位置
 	contour_t _contour;//原始轮廓
-	std::shared_ptr<cv::Mat>_originImage;//原始图像。理论上，Mat本身就具有隐式共享的特征，但为了保证线程安全性使用智能指针
+	std::weak_ptr<cv::Mat>_originImage;//原始图像。理论上，Mat本身就具有隐式共享的特征，但为了保证线程安全性使用智能指针
 };
 
 //从属于同一张图像的晶体集合
@@ -52,14 +60,14 @@ public:
 	
 	std::string path()const { return _imgPath; }
 	size_t size()const { return _crystals.size(); }
-	Crystal&operator[](int id);
+	Crystal&operator[](size_t id);
 
 	contour_t& GetContour(int id) { return _crystals[id].Contour(); }
 	const contour_t& GetContour(int id)const { return _crystals[id].Contour(); }
 	void PushBack(const contour_t& ct ,bool isLoadImage=true) { _crystals.push_back(Crystal(_originImage, ct)); }
 
 	std::shared_ptr<cv::Mat> OriginImg();
-	void ReleaseImg() { if(_originImage) _originImage->release(); }
+	void ReleaseImg() { _originImage = nullptr;/*if(_originImage) _originImage->release();*/ }
 
 protected:
 	std::string _imgPath;
@@ -71,6 +79,7 @@ protected:
 //基本思想：文本文件，顺序读写，末尾插入，按行处理，逗号分隔，链式连接
 //	不追求极致性能优化，string等随意使用。预计规模30000图片，100 0000晶体，约100M文本文件
 //	原则上，这个类是只读的。而static函数Save()和Update()负责写。不建议多线程操作，既不安全，也不效率
+//	扩展名crystalset
 class CrystalSetManager
 {
 public:

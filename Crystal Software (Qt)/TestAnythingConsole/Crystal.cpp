@@ -17,6 +17,17 @@ cv::Rect Crystal::Region()
 	return _originRegion;
 }
 
+Crystal& CommonCrystalSet::operator[](size_t id)
+{
+	CV_Assert(id < size());
+	if (_originImage == nullptr) 
+	{
+		for (auto &c : _crystals)
+			c._originImage = OriginImg();
+	}
+	return _crystals[id];
+}
+
 std::shared_ptr<cv::Mat> CommonCrystalSet::OriginImg()
 {
 	if (_originImage == nullptr || _originImage->empty() == true)
@@ -137,15 +148,18 @@ CommonCrystalSet CrystalSetManager::Get()
 	buf[fread(buf, 1, length, f)] = '\0';
 	_nodeIdx++;
 
+	//读取CommonCrystalSet信息
 	//下一集合指针（9位），上一集合指针（9位），集合序号，晶体个数，保留，保留，文件名（不含文件夹）
 	size_t offset = 0;
 	myGetCommaSegment(buf, offset);
 	myGetCommaSegment(buf, offset);
-	auto nodeIdx = atoi(myGetCommaSegment(buf, offset));
-	
+	auto nodeIdx = atoi(myGetCommaSegment(buf, offset));	
 	auto crystalAmount = atoi(myGetCommaSegment(buf, offset));
 
-	CommonCrystalSet ccs(_dir + std::string(myGetCommaSegment(buf, offset)));
+	//读取晶体数据
+	std::string newdir = _dir;
+	if (_dir.empty() == false)newdir += '\\';
+	CommonCrystalSet ccs(newdir + std::string(myGetCommaSegment(buf, offset)));
 	ccs._crystals.reserve(crystalAmount);
 	contour_t ct;
 	cv::Point pt;
@@ -192,9 +206,7 @@ CommonCrystalSet CrystalSetManager::Get()
 // 			oldoffset = offset+1;
 // 		}
 	}
-	if (nodeIdx % 100 == 0)
-		cout << nodeIdx << "    " << crystalAmount << endl;
-	assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
+	CV_Assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
 
 	return ccs;
 }

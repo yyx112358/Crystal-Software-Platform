@@ -17,7 +17,7 @@ using namespace std;
 QStringList ExpandFilenames(QStringList paths);
 
 
-
+const char *CONST_CHAR_ModifyDmosPythonContent();
 int main(int argc, char *argv[])
 {
 #ifdef _DEBUG
@@ -71,21 +71,96 @@ int main(int argc, char *argv[])
 		}
 		else if (mode == "2" || mode == "generate")//训练集生成模式
 		{
+			//generate 1000 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" "d:\Users\yyx11\Desktop\Saved Pictures\DMOS_2020-02-10"
 			bool generateModeAmountParseSuccess = false;
 			size_t amount = setting.toInt(&generateModeAmountParseSuccess);
 			CV_Assert(generateModeAmountParseSuccess == true);
-			//=====添加待处理文件名=====
-			QStringList blocks = input.split(',');
-			if (input.isEmpty())//空则默认为当前目录
-				blocks.append(".");
-			QStringList filenames = ExpandFilenames(blocks);
-			//TODO:检查有效性，展开CrystalSet
 
-			std::vector<int>selectIdxs;
-			rng.fill(selectIdxs, cv::RNG::UNIFORM, cv::Scalar(0), cv::Scalar(filenames.size()));
+			if (input.contains(".crystalset"))
+			{
+				CV_Assert(input.count(',') == 0);//TODO:暂不支持多个CrystalSet
+				qDebug() << QStringLiteral("正在加载数据集：") << input;
 
-			//std::sort(selectIdxs.begin(), selectIdxs.end());
-			//TODO:将文件随机抽取复制到output，并生成空白brisque_dmos.txt
+				//加载crystalset
+				CrystalSetManager manager;
+				CV_Assert(manager.Load(input.toStdString()) == true);
+				qDebug() << QStringLiteral("数据集索引完成，图像总数：") << manager.size();
+
+				auto vccs = manager.Read(0);
+				size_t crystalAmount = 0;
+				std::vector<int>offsets;
+				for (const auto&ccs : vccs)//生成查找表，以便找到第i个晶体位于哪个CommonCrystalSet
+				{
+					offsets.push_back(crystalAmount);
+					crystalAmount += ccs.size();
+				}
+				offsets.push_back(crystalAmount);
+				qDebug() << QStringLiteral("数据集加载完成，晶体总数：") << crystalAmount;
+
+				//生成随机数
+				std::vector<int>crystalIdxs(amount,0);
+				rng.fill(crystalIdxs, cv::RNG::UNIFORM, cv::Scalar(0), cv::Scalar(crystalAmount));
+				std::function<int(int, vector<int>&)>F_BinSearch = [](int target, vector<int>&vi)->int
+				{
+					for (auto i = 0; i < vi.size(); i++)
+						if (vi[i] <= target&&vi[i + 1] > target)
+							return i;
+					return 0;
+				};
+
+				//搜索并生成
+				QDir dir(output);
+				if (dir.exists() == false)
+					CV_Assert(dir.mkpath(dir.path()));
+				QFile f(dir.filePath("dmos.txt"));//DMOS文件
+				CV_Assert(f.open(QIODevice::WriteOnly | QIODevice::Text));
+				QTextStream ts(&f);
+				for (auto idx : crystalIdxs)
+				{
+					int ccsIdx = F_BinSearch(idx, offsets);
+					//vccs[ccsIdx][idx - offsets[ccsIdx]];
+					QString newname=QString::fromStdString(vccs[ccsIdx].path());
+					newname = QString("%1.%2.%3")
+						.arg(newname.section('\\',-1)).arg(idx - offsets[ccsIdx]).arg("png");
+					newname = dir.filePath(newname);
+					qDebug() << idx << newname;
+					ts << newname << ",\n";
+					//获取图像并适当扩展
+					auto originImg = vccs[ccsIdx][idx - offsets[ccsIdx]].Image();
+					auto ct = vccs[ccsIdx][idx - offsets[ccsIdx]].Contour();
+					double ratio = cv::contourArea(ct) / cv::boundingRect(ct).area();
+					int adjustValue;
+					if (ratio > 0.75)
+						adjustValue = static_cast<int>(originImg.rows*1.0 / 2);//边缘扩展
+					else if (ratio > 0.5)
+						adjustValue = static_cast<int>(originImg.rows*1.0 / 4);//边缘扩展
+					else
+						adjustValue = static_cast<int>(originImg.rows*1.0 / 8);//边缘扩展
+					originImg = originImg.adjustROI(adjustValue, adjustValue, adjustValue, adjustValue);
+					//写入数据
+					cv::imwrite(newname.toStdString(), originImg);
+					vccs[ccsIdx].ReleaseImg();
+				}
+				f.close();
+				//写入dmos修改脚本
+				f.setFileName(dir.filePath(QStringLiteral("修改dmos文件夹为当前.py")));
+				f.open(QIODevice::WriteOnly | QIODevice::Text);
+				f.write(CONST_CHAR_ModifyDmosPythonContent());
+				f.close();
+			}
+			else
+			{
+				//=====添加待处理文件名=====
+				QStringList blocks = input.split(',');
+				if (input.isEmpty())//空则默认为当前目录
+					blocks.append(".");
+				QStringList filenames = ExpandFilenames(blocks);
+				//TODO:检查有效性，展开CrystalSet
+
+				std::vector<int>selectIdxs;
+				rng.fill(selectIdxs, cv::RNG::UNIFORM, cv::Scalar(0), cv::Scalar(filenames.size()));
+				CV_Assert(0);
+			}
 		}
 		else if (mode == "3" || mode == "update")
 		{
@@ -136,7 +211,7 @@ int main(int argc, char *argv[])
 			{
 				auto filename = filenames[i];
 				if (results[i].isEmpty() == false 
-					&& QStringList{ "xml","yaml","json" }.contains(filename.section('.', -1, -1).toLower()))
+					&& filename.section('.', -1, -1).toLower()=="crystalset")
 				{
 					qDebug() << filename << "\t" << "will support soon!" << endl;
 				}
@@ -419,3 +494,24 @@ public:
 	const QStringList&filenames;
 	const QStringList&results;
 };
+const char *CONST_CHAR_ModifyDmosPythonContent()
+{
+return
+"import os\
+\
+dir = os.path.abspath(os.path.curdir)\
+f = open(os.path.join(dir, 'dmos.txt'), 'r')\
+content = []\
+if f:\
+    for line in f:\
+        sep = '/'\
+        if line.count('\\\\') > 0:\
+            sep = '\\\\'\
+        content.append(os.path.join(dir, line.split(sep)[-1]))\
+    f.close()\
+\
+if len(content)>0:\
+    f = open(os.path.join(dir, 'dmos.txt'), 'w')\
+    f.writelines(content)\
+    f.close()";
+}
