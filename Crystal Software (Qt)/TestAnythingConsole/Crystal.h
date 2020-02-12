@@ -1,6 +1,6 @@
 #pragma once
 
-#include <opencv2\core\mat.hpp>
+//#include <opencv2\core\mat.hpp>
 //#include <opencv2\core\persistence.hpp>
 //#include <opencv2\imgproc\imgproc.hpp>
 #include <vector>

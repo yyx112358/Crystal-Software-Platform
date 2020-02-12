@@ -128,15 +128,12 @@ bool Brisque::Train(std::string featurePath, std::string dmosPath)
 	try
 	{
 		cv::Mat featureMat, dmosMat;
-		cv::Mat featureRange;
 		std::set<int>invalidIdx;//无效样本（没有主观评分DMOS或featureMat无效（全0））
 
-								//DMOS
+		//读取DMOS。如果某个项非空，则对其DMOS求均值，否则记为无效样本
 		QFile f(QString::fromStdString(dmosPath));
 		CV_Assert(f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
 		QTextStream ts(&f);
-		ts.readLine();
-		ts.readLine();
 		for (int idx = 0; ts.atEnd() == false; idx++)
 		{
 			std::vector<double>mos;
@@ -160,7 +157,7 @@ bool Brisque::Train(std::string featurePath, std::string dmosPath)
 		//特征矩阵
 		featureMat = cv::imread(featurePath, cv::IMREAD_UNCHANGED);
 		CV_Assert(featureMat.empty() == false && featureMat.cols == BRISQUE_FEATURE_LENGTH);
-		for (auto i = 0; i < featureMat.rows; i++)
+		for (auto i = 0; i < featureMat.rows; i++)//按行搜索，如果某一行全0则记为无效行
 			if (cv::countNonZero(featureMat.row(i) == 0))
 				invalidIdx.insert(i);
 
@@ -179,10 +176,86 @@ bool Brisque::Train(std::string featurePath, std::string dmosPath)
 	}
 	catch (cv::Exception&e)
 	{
-		Clear();
 		return false;
 	}
 }
+
+bool Brisque::Train(std::vector<std::string> featurePaths, std::string dmosPath)
+{
+	try
+	{
+		cv::Mat dmosMat;
+		std::set<int>invalidIdx;//无效样本（没有主观评分DMOS或featureMat无效（全0））
+
+		//读取DMOS。如果某个项非空，则对其DMOS求均值，否则记为无效样本
+		QFile f(QString::fromStdString(dmosPath));
+		CV_Assert(f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
+		QTextStream ts(&f);
+		for (int idx = 0; ts.atEnd() == false; idx++)
+		{
+			std::vector<double>mos;
+			bool b = false;
+			double avgmos = 0;
+
+			for (auto s : ts.readLine().split(','))
+			{
+				double d = s.toDouble(&b);
+				if (b)	mos.push_back(d);
+			}
+			if (mos.size() > 0)
+				avgmos = cv::mean(mos)[0];
+			else
+				invalidIdx.insert(idx);
+
+			dmosMat.push_back(avgmos);
+		}
+		f.close();
+
+		//特征矩阵
+		std::vector<cv::Mat>featureMats;
+		for (auto featurePath : featurePaths)
+			featureMats.push_back(cv::imread(featurePath, cv::IMREAD_UNCHANGED));
+		
+		const auto featureRows = dmosMat.rows;
+		for (auto it = featureMats.begin(); it != featureMats.end();)//查找无效元素
+		{
+			if (it->empty() == true || it->rows != featureRows || it->cols != BRISQUE_FEATURE_LENGTH)
+				it = featureMats.erase(it);
+			else
+			{
+				for (auto i = 0; i < it->rows; i++)
+					if (cv::countNonZero(it->row(i) == 0))
+						invalidIdx.insert(i);
+				++it;
+			}
+		}
+		CV_Assert(featureMats.empty() == false);
+
+		//去掉无效值
+		cv::Mat trainData, trainLabel;
+		std::cout << "无效行：";
+		for (auto i = 0; i < featureRows; i++)
+		{
+			if (invalidIdx.count(i) == 0)
+			{
+				for(auto &featureMat:featureMats)
+				{
+					trainData.push_back(featureMat.row(i));
+					trainLabel.push_back(dmosMat.row(i));
+				}
+			}
+			else
+				std::cout << i << ',';
+		}
+
+		return Train(trainData, trainLabel);
+	}
+	catch (cv::Exception&e)
+	{
+		return false;
+	}
+}
+
 cv::Mat Brisque::Predict(cv::InputArray src) const
 {
 	cv::Mat result;
@@ -336,6 +409,8 @@ void Brisque::AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsig
 
 cv::Mat Brisque::ComputeBrisqueFeature(const cv::Mat& orig)
 {
+	if (orig.rows <= 5 && orig.cols <= 5)
+		return cv::Mat(BRISQUE_FEATURE_LENGTH, 1, BRISQUE_MAT_TYPE, cv::Scalar(0));
 	cv::Mat orig_bw;
 	// convert to grayscale 
 	if (orig.channels() == 3)
@@ -406,7 +481,7 @@ cv::Mat Brisque::ComputeBrisqueFeature(const cv::Mat& orig)
 	cout << endl;*/
 	featureVector = featureVector.reshape(1, 1);//变换为行向量
 	featureVector.convertTo(featureVector, BRISQUE_MAT_TYPE);
-	assert(featureVector.total() == BRISQUE_FEATURE_LENGTH);
+	CV_Assert(featureVector.total() == BRISQUE_FEATURE_LENGTH);
 	return featureVector;
 }
 

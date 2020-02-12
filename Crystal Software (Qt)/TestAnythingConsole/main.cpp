@@ -26,19 +26,25 @@ int main(int argc, char *argv[])
 	cv::RNG rng(static_cast<unsigned int>(time(nullptr)));
 #endif // _DEBUG
 
+#ifdef _DEBUG
 	for (auto i = 0; i < argc; i++)
 		std::cout << argv[i] << endl;
+#endif // _DEBUG
 	
+#ifndef _DEBUG
 	try
+#endif // _DEBUG
 	{
 		cv::CommandLineParser parser(argc, argv, 
-			"{help h usage ?    |		|帮助。}"
-			"{@mode             |predict|模式：1-训练，2-训练集生成，其它-预测}"
-			"{@setting          |       |设置}"
-			"{@input            |       |输入}"
-			"{@output           |       |输出}"
-			"{addition          |       |附加信息}"
-			"{display           |0      |是否显示}");
+			"{help h usage ?      |		  |帮助。}"
+			"{@mode               |predict|模式：1-训练，2-训练集生成，其它-预测}"
+			"{@setting            |       |设置}"
+			"{@input              |       |输入}"
+			"{@output             |       |输出}"
+			"{addition            |       |附加信息}"
+			"{display             |0      |是否显示}"
+			"{train_expand_sample |0      |是否扩展样本}"
+			"{generate_reset      |       |generate模式下清空旧的数据}");
 		parser.about("Application name v1.0.0");
 		if (parser.has("help") == true)
 			parser.printMessage();
@@ -55,23 +61,98 @@ int main(int argc, char *argv[])
 		}
 		if (mode == "1" || mode == "train")
 		{
+			//train 2 -train_expand_sample=8 "d:\Users\yyx11\Desktop\Saved Pictures\BRISQUE_2020-02-10\dmos.txt" "d:\Users\yyx11\Desktop\Saved Pictures\BRISQUE_2020-02-10"
+			int trainLevel = setting.toInt();
+			int expandLevel;
+			if (parser.has("train_expand_sample"))
+				expandLevel = parser.get<int>("train_expand_sample");
+			else
+				expandLevel = 0;
 
-// 			QFile fpath(input.split(',')[0]),finfo(input.split(',')[1]),fout(output);
-// 			CV_Assert(fpath.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text) == true
-// 				&& finfo.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text) == true
-// 				&& fout.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text) == true);
-// 			
-// 			QTextStream tspath(&fpath), tsinfo(&finfo);
-// 			QDataStream ()
-			//train 1 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" ""
-			CrystalSetManager manager;
-			manager.Load(input.toStdString());
-			std::vector<CommonCrystalSet>vccs;
-			vccs = manager.Read(0);
+			if (trainLevel <= 0)//0级，什么都不做
+				return 0;
+			auto filename_dmos = input.section(',', 0, 1);
+			auto filename_features = input.split(',');
+			filename_features.pop_front();
+			Brisque brisque;
+
+			if (trainLevel == 3 || trainLevel == 4)
+				throw cv::Exception(0, "请使用python工具重新获得DMOS\n"
+					"如果需要重新获得dmos.txt，请使用generate模式",
+					__FUNCTION__, __FILE__, __LINE__);
+			
+			if (trainLevel == 2 || trainLevel == 4 )
+			{
+				if (filename_dmos.section('.', -1).toLower() != "txt")
+					qWarning() << QString("DMOS file [%1] is not a txt file. May not support")
+					.arg(filename_dmos);
+				QFile f(filename_dmos);
+				CV_Assert(f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
+				QTextStream ts(&f);
+				QStringList filenames;
+				for (int idx = 0; ts.atEnd() == false; idx++)
+				{
+					auto line = ts.readLine();
+					if (line.isEmpty() == false)
+						filenames.append(line.split(',')[0]);
+				}
+				f.close();
+
+				std::vector<cv::Mat>featureMats;
+				if (expandLevel < 1)expandLevel = 1; else if (expandLevel > 8)expandLevel = 8;
+// 				if (expandLevel == 1)featureMats.resize(2);//垂直翻转
+// 				else if (expandLevel == 2)featureMats.resize(4);//垂直翻转+旋转90°
+// 				else if (expandLevel == 3)featureMats.resize(8);//垂直翻转+旋转90°/180°/270°
+				featureMats.resize(expandLevel);
+
+				for (auto &featureMat : featureMats)
+					featureMat = featureMat.zeros(filenames.size(), BRISQUE_FEATURE_LENGTH, CV_32F);
+
+				size_t fileAmount = filenames.size();
+				int64 totalTime = cv::getTickCount();
+
+			#pragma omp parallel for//计算是相互独立的，可用并行处理加速
+				for (int i = 0; i < fileAmount; i++)
+				{
+					auto filename = filenames[i].toStdString();
+					cv::Mat img = cv::imread(filename, cv::IMREAD_GRAYSCALE);
+					cout << filename << "\n";
+					if (img.rows <= 5 || img.cols <= 5)
+						continue;
+					for (auto j = 0; j < featureMats.size(); j++)
+					{
+						cv::Mat feature1 = img;
+						if (j & 0x01 == 1)cv::flip(feature1, feature1, 0);
+						if (j >> 1 == 1)cv::rotate(feature1, feature1, cv::ROTATE_90_CLOCKWISE);
+						else if (j >> 1 == 2)cv::rotate(feature1, feature1, cv::ROTATE_180);
+						else if (j >> 1 == 3)cv::rotate(feature1, feature1, cv::ROTATE_90_COUNTERCLOCKWISE);
+						feature1 = brisque.ComputeBrisqueFeature(feature1);
+						featureMats[j].row(i) += feature1;
+					}
+				}
+
+				totalTime = cv::getTickCount() - totalTime;
+				cout << "total=" << totalTime / cv::getTickFrequency() << endl;
+
+				filename_features.clear();
+				for (auto i = 0; i < featureMats.size(); i++)
+				{
+					QString featureName = filename_dmos;
+					featureName.chop(featureName.section('.', -1).size()+1);
+					featureName = featureName + "_" + QString::number(i) + ".exr";
+					cv::imwrite(featureName.toStdString(), featureMats[i]);
+					filename_features.append(featureName);
+				}
+			}
+			std::vector<std::string>std_filename_features;
+			for (auto s : filename_features)
+				std_filename_features.push_back(s.toStdString());
+			CV_Assert(brisque.Train(std_filename_features, filename_dmos.toStdString()));
+			brisque.Save((output + "\\brisque.json").toStdString(), (output + "\\brisque_model.json").toStdString());
 		}
 		else if (mode == "2" || mode == "generate")//训练集生成模式
 		{
-			//generate 1000 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" "d:\Users\yyx11\Desktop\Saved Pictures\DMOS_2020-02-10"
+			//generate 1000 "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset" "d:\Users\yyx11\Desktop\Saved Pictures\BRISQUE_2020-02-10"
 			bool generateModeAmountParseSuccess = false;
 			size_t amount = setting.toInt(&generateModeAmountParseSuccess);
 			CV_Assert(generateModeAmountParseSuccess == true);
@@ -86,7 +167,7 @@ int main(int argc, char *argv[])
 				CV_Assert(manager.Load(input.toStdString()) == true);
 				qDebug() << QStringLiteral("数据集索引完成，图像总数：") << manager.size();
 
-				auto vccs = manager.Read(0);
+				auto vccs = manager.Read(0);//晶体集合
 				size_t crystalAmount = 0;
 				std::vector<int>offsets;
 				for (const auto&ccs : vccs)//生成查找表，以便找到第i个晶体位于哪个CommonCrystalSet
@@ -100,33 +181,73 @@ int main(int argc, char *argv[])
 				//生成随机数
 				std::vector<int>crystalIdxs(amount,0);
 				rng.fill(crystalIdxs, cv::RNG::UNIFORM, cv::Scalar(0), cv::Scalar(crystalAmount));
-				std::function<int(int, vector<int>&)>F_BinSearch = [](int target, vector<int>&vi)->int
+				std::function<int(int, vector<int>&)>F_BinSearch 
+					= [](int target, vector<int>&data_list)->int//二分查找，搜索target晶体对应的图片位置
 				{
-					for (auto i = 0; i < vi.size(); i++)
-						if (vi[i] <= target&&vi[i + 1] > target)
-							return i;
-					return 0;
+					int low = 0, high = data_list.size() - 1;
+					while (low <= high)
+					{
+						int mid = (low + high) / 2;
+						if (data_list[mid] == target)
+						{
+							while (mid + 1 < data_list.size() && data_list[mid + 1] == target)
+								mid++;
+							return mid;
+						}
+						else if (data_list[mid] > target)
+							high = mid - 1;
+						else
+							low = mid + 1;
+					}
+					return high;
+// 					for (auto i = 0; i < vi.size(); i++)
+// 						if (vi[i] <= target&&vi[i + 1] > target)
+// 							return i;
+// 					return 0;
 				};
 
 				//搜索并生成
 				QDir dir(output);
+				QFile f(dir.filePath("dmos.txt"));//DMOS文件
 				if (dir.exists() == false)
 					CV_Assert(dir.mkpath(dir.path()));
-				QFile f(dir.filePath("dmos.txt"));//DMOS文件
-				CV_Assert(f.open(QIODevice::WriteOnly | QIODevice::Text));
+				if (parser.has("generate_reset") == true)
+				{
+					qWarning() << QStringLiteral("-generate_reset选项被选中，将删除旧的数据");
+					for (auto filename : dir.entryList(
+						QStringList{ "*.png","*.jpg","*.jpeg","*.bmp", },
+						QDir::Files, QDir::SortFlag::Name))
+						qWarning() << "Removing" << filename << dir.remove(filename);
+				}
+				if (parser.has("generate_reset") == false && dir.exists("dmos.txt") == true)
+				{
+					//如果不重置，则重命名
+					f.setFileName(dir.filePath(QString("dmos_%1.txt")
+						.arg(QDateTime::currentDateTime().toSecsSinceEpoch())));
+					CV_Assert(f.open(QIODevice::NewOnly | QIODevice::WriteOnly | QIODevice::Text));
+				}
+				else
+					CV_Assert(f.open( QIODevice::WriteOnly | QIODevice::Text));
+
+				qInfo() << QStringLiteral("开始生成训练集，总数：") << amount;
 				QTextStream ts(&f);
+				//#pragma omp parallel for
 				for (auto idx : crystalIdxs)
 				{
 					int ccsIdx = F_BinSearch(idx, offsets);
-					//vccs[ccsIdx][idx - offsets[ccsIdx]];
-					QString newname=QString::fromStdString(vccs[ccsIdx].path());
-					newname = QString("%1.%2.%3")
-						.arg(newname.section('\\',-1)).arg(idx - offsets[ccsIdx]).arg("png");
-					newname = dir.filePath(newname);
-					qDebug() << idx << newname;
-					ts << newname << ",\n";
+
+					#ifdef _DEBUG
+					int n = static_cast<int>(rng.uniform(0, 8));
+					for(auto i=0;i<n;i++)
+						ts << ',' << rng.uniform(0.0, 1.0);
+					ts << "\n";
+					#else
+					ts << ",\n";
+					#endif // _DEBUG
 					//获取图像并适当扩展
 					auto originImg = vccs[ccsIdx][idx - offsets[ccsIdx]].Image();
+					if (originImg.rows < 10 || originImg.cols < 10)
+						continue;
 					auto ct = vccs[ccsIdx][idx - offsets[ccsIdx]].Contour();
 					double ratio = cv::contourArea(ct) / cv::boundingRect(ct).area();
 					int adjustValue;
@@ -137,6 +258,14 @@ int main(int argc, char *argv[])
 					else
 						adjustValue = static_cast<int>(originImg.rows*1.0 / 8);//边缘扩展
 					originImg = originImg.adjustROI(adjustValue, adjustValue, adjustValue, adjustValue);
+					
+					//重命名名称。格式：原文件名.晶体在CommonCrystalSet中序号.png
+					QString newname = QString::fromStdString(vccs[ccsIdx].path());
+					newname = QString("%1.%2.%3")
+						.arg(newname.section('\\', -1)).arg(idx - offsets[ccsIdx]).arg("png");
+					newname = dir.filePath(newname);
+					qDebug() << idx << newname;
+					ts << newname;
 					//写入数据
 					cv::imwrite(newname.toStdString(), originImg);
 					vccs[ccsIdx].ReleaseImg();
@@ -216,7 +345,7 @@ int main(int argc, char *argv[])
 					qDebug() << filename << "\t" << "will support soon!" << endl;
 				}
 			}
-
+			//写入output
 			if (output.isEmpty() == false)
 			{
 				QFile f(output);
@@ -234,11 +363,13 @@ int main(int argc, char *argv[])
 		system("pause");
 		return 0;
 	}
+#ifndef _DEBUG
 	catch (cv::Exception &e)
 	{
 		system("pause");
 		return -1;
 	}
+#endif // _DEBUG
 
 // 	if (argc > 1)
 // 	{
@@ -473,45 +604,25 @@ QStringList ExpandFilenames(QStringList paths)
 	}
 	return filenames;
 }
-class SavePredictResultAtClose
-{
-public:
-	SavePredictResultAtClose(QString outPath, const QStringList&filenames, const QStringList&results)
-		:outPath(outPath), filenames(filenames), results(results)
-	{}
-	~SavePredictResultAtClose()
-	{
-		if (outPath.isEmpty() == false)
-		{
-			QFile f(outPath);
-			CV_Assert(f.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text));
-			QTextStream ts(&f);
-			for (auto i = 0; i < filenames.size(); i++)
-				ts << filenames[i] << ',' << results[i] << endl;
-		}
-	}
-	QString outPath;
-	const QStringList&filenames;
-	const QStringList&results;
-};
+
 const char *CONST_CHAR_ModifyDmosPythonContent()
 {
 return
-"import os\
-\
-dir = os.path.abspath(os.path.curdir)\
-f = open(os.path.join(dir, 'dmos.txt'), 'r')\
-content = []\
-if f:\
-    for line in f:\
-        sep = '/'\
-        if line.count('\\\\') > 0:\
-            sep = '\\\\'\
-        content.append(os.path.join(dir, line.split(sep)[-1]))\
-    f.close()\
-\
-if len(content)>0:\
-    f = open(os.path.join(dir, 'dmos.txt'), 'w')\
-    f.writelines(content)\
+"import os\n\
+\n\
+dir = os.path.abspath(os.path.curdir)\n\
+f = open(os.path.join(dir, 'dmos.txt'), 'r')\n\
+content = []\n\
+if f:\n\
+    for line in f:\n\
+        sep = '/'\n\
+        if line.count('\\\\') > 0:\n\
+            sep = '\\\\'\n\
+        content.append(os.path.join(dir, line.split(sep)[-1]))\n\
+    f.close()\n\
+\n\
+if len(content)>0:\n\
+    f = open(os.path.join(dir, 'dmos.txt'), 'w')\n\
+    f.writelines(content)\n\
     f.close()";
 }

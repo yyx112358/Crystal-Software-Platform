@@ -38,6 +38,7 @@ public:
 	//feature为exr文件，32位浮点
 	//dmos为csv文本文件，每一行一个样本，存放：路径，评分
 	bool Train(std::string featurePath, std::string dmosPath);
+	bool Train(std::vector<std::string> featurePaths, std::string dmosPath);
 
 	cv::Mat Predict(cv::InputArray img)const;
 	//TODO:cv::Mat Predict(CrystalSet cs)const;
