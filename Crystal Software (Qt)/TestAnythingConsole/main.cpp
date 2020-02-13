@@ -18,12 +18,15 @@ QStringList ExpandFilenames(QStringList paths);
 
 
 const char *CONST_CHAR_ModifyDmosPythonContent();
+const char *CONST_CHAR_CommanLineParserAboutMessage();
 int main(int argc, char *argv[])
 {
 #ifdef _DEBUG
 	cv::RNG rng(411);
+	srand(411);
 #else
 	cv::RNG rng(static_cast<unsigned int>(time(nullptr)));
+	srand(time(nullptr));
 #endif // _DEBUG
 
 #ifdef _DEBUG
@@ -37,16 +40,20 @@ int main(int argc, char *argv[])
 	{
 		cv::CommandLineParser parser(argc, argv, 
 			"{help h usage ?      |		  |帮助。}"
-			"{@mode               |predict|模式：1-训练，2-训练集生成，其它-预测}"
-			"{@setting            |       |设置}"
-			"{@input              |       |输入}"
-			"{@output             |       |输出}"
+			"{@mode               |predict|模式。train-训练，generate-训练集生成，update-数据集升级，其它-预测}"
+			"{@setting            |       |设置。依模式不同而不同}"
+			"{@input              |       |输入。该参数当中不能出现空格，如果出现空格必须用双引号括起}"
+			"{@output             |       |输出。该参数当中不能出现空格，如果出现空格必须用双引号括起}"
 			"{addition            |       |附加信息}"
-			"{display             |0      |是否显示}"
-			"{train_expand_sample |0      |是否扩展样本}"
-			"{generate_reset      |       |generate模式下清空旧的数据}");
-		parser.about("Application name v1.0.0");
-		if (parser.has("help") == true)
+			"{display             |0      |是否显示运行信息}"
+			"{train_expand_sample |1      |是否扩展样本。\n"
+			"                取值>1意味着扩展样本，将强制重新生成特征矩阵，目前最多扩展8倍。\n"
+			"                扩展方式包括：是/否垂直翻转+旋转90/180/270/0°}"
+			"{generate_reset      |       |是否清空样本。\n"
+			"                给出，则清空输出文件夹下dmos.txt和训练集图像\n"
+			"                不给出，则不清空输出文件夹下训练集图像，将建立名称不同的dmos文件}");
+		parser.about(CONST_CHAR_CommanLineParserAboutMessage());
+		if (parser.has("h") == true)
 			parser.printMessage();
 
 		QString mode = QString::fromStdString(parser.get<std::string>("@mode")),
@@ -59,33 +66,43 @@ int main(int argc, char *argv[])
 			parser.printErrors();
 			return -1;
 		}
+		
 		if (mode == "1" || mode == "train")
 		{
+			//输入参数检查
 			//train 2 -train_expand_sample=8 "d:\Users\yyx11\Desktop\Saved Pictures\BRISQUE_2020-02-10\dmos.txt" "d:\Users\yyx11\Desktop\Saved Pictures\BRISQUE_2020-02-10"
-			int trainLevel = setting.toInt();
-			int expandLevel;
-			if (parser.has("train_expand_sample"))
+			int trainLevel = setting.toInt();//训练等级。请参考CONST_CHAR_CommanLineParserAboutMessage()中信息
+			int expandLevel;//扩展等级，代表扩展出n个图像
+			if (parser.has("train_expand_sample")) 
+			{
 				expandLevel = parser.get<int>("train_expand_sample");
+				if (expandLevel < 1)
+					expandLevel = 1; 
+				else if (expandLevel > 8)
+					expandLevel = 8;
+			}
 			else
-				expandLevel = 0;
-
+				expandLevel = 1;
+			CV_Assert(QFileInfo(output).isDir() == true);
+			auto filename_dmos = input.section(',', 0, 1);//第0个为dmos文件
+			CV_Assert(QFileInfo(filename_dmos).isFile());
+			if (QFileInfo(filename_dmos).suffix().toLower() != "txt")
+				qWarning().noquote() << QString("DMOS file [%1] is not a txt file. May not support")
+				.arg(filename_dmos);
+			auto filename_features = input.split(',');//其余为feature文件
+			filename_features.pop_front();
+			
 			if (trainLevel <= 0)//0级，什么都不做
 				return 0;
-			auto filename_dmos = input.section(',', 0, 1);
-			auto filename_features = input.split(',');
-			filename_features.pop_front();
-			Brisque brisque;
 
-			if (trainLevel == 3 || trainLevel == 4)
+			if (trainLevel == 3 || trainLevel == 4)//重新获得dmos
 				throw cv::Exception(0, "请使用python工具重新获得DMOS\n"
 					"如果需要重新获得dmos.txt，请使用generate模式",
 					__FUNCTION__, __FILE__, __LINE__);
 			
-			if (trainLevel == 2 || trainLevel == 4 )
+			if (trainLevel == 2 || trainLevel == 4 )//重新获得feature
 			{
-				if (filename_dmos.section('.', -1).toLower() != "txt")
-					qWarning() << QString("DMOS file [%1] is not a txt file. May not support")
-					.arg(filename_dmos);
+				qDebug() << QStringLiteral("即将重新获得特征矩阵，个数：") << expandLevel;
 				QFile f(filename_dmos);
 				CV_Assert(f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text));
 				QTextStream ts(&f);
@@ -98,42 +115,34 @@ int main(int argc, char *argv[])
 				}
 				f.close();
 
-				std::vector<cv::Mat>featureMats;
-				if (expandLevel < 1)expandLevel = 1; else if (expandLevel > 8)expandLevel = 8;
-// 				if (expandLevel == 1)featureMats.resize(2);//垂直翻转
-// 				else if (expandLevel == 2)featureMats.resize(4);//垂直翻转+旋转90°
-// 				else if (expandLevel == 3)featureMats.resize(8);//垂直翻转+旋转90°/180°/270°
-				featureMats.resize(expandLevel);
-
-				for (auto &featureMat : featureMats)
-					featureMat = featureMat.zeros(filenames.size(), BRISQUE_FEATURE_LENGTH, CV_32F);
-
+				std::vector<cv::Mat>featureMats(expandLevel,
+					cv::Mat(filenames.size(), BRISQUE_FEATURE_LENGTH, CV_32F,cv::Scalar(0)));
 				size_t fileAmount = filenames.size();
 				int64 totalTime = cv::getTickCount();
-
 			#pragma omp parallel for//计算是相互独立的，可用并行处理加速
 				for (int i = 0; i < fileAmount; i++)
 				{
 					auto filename = filenames[i].toStdString();
 					cv::Mat img = cv::imread(filename, cv::IMREAD_GRAYSCALE);
 					cout << filename << "\n";
-					if (img.rows <= 5 || img.cols <= 5)
+					if (img.rows <= 5 || img.cols <= 5)//不可过小
 						continue;
 					for (auto j = 0; j < featureMats.size(); j++)
 					{
 						cv::Mat feature1 = img;
+						//扩展，对第j张，如果j是奇数，则垂直翻转;如果j>>1为1、2、3，则旋转90/180/270
 						if (j & 0x01 == 1)cv::flip(feature1, feature1, 0);
 						if (j >> 1 == 1)cv::rotate(feature1, feature1, cv::ROTATE_90_CLOCKWISE);
 						else if (j >> 1 == 2)cv::rotate(feature1, feature1, cv::ROTATE_180);
 						else if (j >> 1 == 3)cv::rotate(feature1, feature1, cv::ROTATE_90_COUNTERCLOCKWISE);
-						feature1 = brisque.ComputeBrisqueFeature(feature1);
+						feature1 = Brisque::ComputeBrisqueFeature(feature1);
 						featureMats[j].row(i) += feature1;
 					}
 				}
-
 				totalTime = cv::getTickCount() - totalTime;
 				cout << "total=" << totalTime / cv::getTickFrequency() << endl;
 
+				//重新写入features
 				filename_features.clear();
 				for (auto i = 0; i < featureMats.size(); i++)
 				{
@@ -144,11 +153,16 @@ int main(int argc, char *argv[])
 					filename_features.append(featureName);
 				}
 			}
+
+			Brisque brisque;
 			std::vector<std::string>std_filename_features;
 			for (auto s : filename_features)
 				std_filename_features.push_back(s.toStdString());
+			qDebug() << "即将开始训练";
 			CV_Assert(brisque.Train(std_filename_features, filename_dmos.toStdString()));
-			brisque.Save((output + "\\brisque.json").toStdString(), (output + "\\brisque_model.json").toStdString());
+			qDebug() << "训练完成，将保存文件到：" << output + "\\brisque.json" << output + "\\brisque_model.json";
+			CV_Assert(brisque.Save((output + "\\brisque.json").toStdString(), 
+				(output + "\\brisque_model.json").toStdString()));
 		}
 		else if (mode == "2" || mode == "generate")//训练集生成模式
 		{
@@ -156,6 +170,7 @@ int main(int argc, char *argv[])
 			bool generateModeAmountParseSuccess = false;
 			size_t amount = setting.toInt(&generateModeAmountParseSuccess);
 			CV_Assert(generateModeAmountParseSuccess == true);
+			
 
 			if (input.contains(".crystalset"))
 			{
@@ -371,6 +386,136 @@ int main(int argc, char *argv[])
 	}
 #endif // _DEBUG
 
+
+
+}
+QStringList ExpandFilenames(QStringList paths)
+{
+	QStringList filenames;
+	for (auto path : paths)
+	{
+		QFileInfo fileInfo(path);
+		if (fileInfo.isDir())//目录，遍历给定目录下所有支持图片(jpg,png,bmp,jpeg)
+		{
+			QDir dir(fileInfo.filePath());
+			auto result = dir.entryList(
+				QStringList{ "*.png","*.jpg","*.jpeg","*.bmp", },
+				QDir::Files, QDir::SortFlag::Name);
+			qDebug() << QStringLiteral("文件夹:") << fileInfo.filePath() << endl
+				<< QStringLiteral("总数:") << result.size();
+			for (auto &r : result)
+				r = dir.filePath(r);
+			filenames.append(result);
+		}
+		else if (fileInfo.isFile() && fileInfo.suffix().toLower() == "txt")//txt，txt则按行遍历其中所有文件名
+		{
+			QFile f(path);
+			if (!f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text))
+				continue;
+			QTextStream ts(&f);
+			while (ts.atEnd() == false)
+			{
+				auto line = ts.readLine();
+				if (line.isEmpty() == false)
+					filenames.append(ts.readLine());
+			}
+		}
+		else//其余情况直接加入filenames（引号会被命令行程序自动去掉）
+			filenames.append(path);
+	}
+	return filenames;
+}
+
+const char *CONST_CHAR_ModifyDmosPythonContent()
+{
+return
+"import os\n\
+\n\
+dir = os.path.abspath(os.path.curdir)\n\
+f = open(os.path.join(dir, 'dmos.txt'), 'r')\n\
+content = []\n\
+if f:\n\
+    for line in f:\n\
+        sep = '/'\n\
+        if line.count('\\\\') > 0:\n\
+            sep = '\\\\'\n\
+        content.append(os.path.join(dir, line.split(sep)[-1]))\n\
+    f.close()\n\
+\n\
+if len(content)>0:\n\
+    f = open(os.path.join(dir, 'dmos.txt'), 'w')\n\
+    f.writelines(content)\n\
+    f.close()";
+}
+
+const char * CONST_CHAR_CommanLineParserAboutMessage()
+{
+	return
+		"\nBrisque No-reference Image Quality Assessment v1.0\n"
+		"Brisque 无参考图像质量评估 v1.0\n\n"
+		"当前共有4种模式：\n"
+		"    train-训练模式;generate-训练集生成模式;update-升级旧有文件格式;predict(默认)-预测模式\n"
+		"命令行信息包含4个占位参数：mode setting input output，同一参数包含多个值使用逗号分隔，详细定义如下：\n"
+		"1.train模式\n"
+		"   参考命令行：train 2 -train_expand_sample=8 \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020 - 02 - 10\\dmos.txt\" \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020 - 02 - 10\"\n"
+		"   setting:重新训练等级\n"
+		"           0.无需训练;1.使用已有feature和dmos;2.重新获得feature，使用已有dmos\n"
+		"           3.使用已有的feature，重新获得dmos；；4.重新获得feature和dmos\n"
+		"   input:输入文件路径，逗号分隔，最好使用双引号括起\n"
+		"           序号0：主观评分dmos文件路径。每个图片应当占据一行，逗号分隔\n"
+		"                 第0位为路径，其后若干个数据为主观评分。评分个数为0将被视为无效数据）\n"
+		"           序号1~：特征矩阵文件路径，一般存储为32位浮点exr文件\n"
+		"                 特征矩阵高度应与dmos个数一致，在1.0版本，宽度为36。一行全0则视为无效数据\n"
+		"   output:输出文件夹路径【不是文件路径】\n"
+		"                 生成两个json文件。brisque.json为设定文件，brisque_model.json为SVM训练参数\n"
+		"                 参考predict模式-setting部分\n"
+		"   train_expand_sample:样本扩展参数，见参数说明部分\n"
+		"2.generate模式:\n"
+		"   参考命令行：generate 1000 \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\first.crystalset\" \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020 - 02 - 10\"\n"
+		"	setting:训练集大小\n"
+		"           值为生成训练集大小，将从输入数据集中随机抽取\n"
+		"   input:输入文件路径【当前只支持单个crystalset数据集】\n"
+		"           crystalset文件可通过图像分割算法获得vector<CommonCrystalSet获得，或通过update mode获得\n"
+		"           其详细定义参考Crystal.h\n"
+		"   output:输出文件夹路径【不是文件路径】\n"
+		"                 将在该文件夹下生成对应的晶体图片、不带评分的dmos文件和一个重命名用的python文件\n"
+		"                 对应的晶体图片：将对小图片进行适量放大。其名称为源文件名+晶体在图片中序号+png\n"
+		"                 不带评分的dmos文件：参见train模式-input部分\n"
+		"                 重命名用的python文件：移动了文件夹时使用，用于将dmos当中的图像文件夹路径更新为当前文件夹\n"
+		"   generate_reset:是否清空输出文件夹下已有数据，见参数说明部分\n"
+		"3.update模式\n"
+		"   参考命令行：update csv \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\olddata\\Crystals_Image_Path_1.csv\",\"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\olddata\\Crystals_Info_1.csv\",\"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\fig_batch1" "d:\\Users\\yyx11\\Desktop\\Saved Pictures\\first.crystalset\"\n"
+		"	setting:升级类型\n"
+		"           暂时只支持CSV转换为crystalset，\n"
+		"   input:输入文件路径，逗号分隔\n"
+		"   output:输出文件路径\n"
+		"4.predict模式\n"
+		"   参考命令行：predict \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\brisque.json\" \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\Crystal_   0.png\",\"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\Crystal_   1.png\",\"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\FileNames.txt\",\"d:\\Users\\yyx11\\Desktop\\Saved Pictures\"  \"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\result.txt\"\n"
+		"	尝试载入setting。载入失败则返回-1，载入成功则可用于预测ImagePath\n"
+		"	setting:setting是一个OpenCV的FileStorage，提供相关信息。\n"
+		"	        支持xml, yaml, json，默认名brisque.json，包含：\n"
+		"	        lower_range：模型归一化时下限，数组形式\n"
+		"	        upper_range：模型归一化时上限，数组形式\n"
+		"	        model_path：表示svm模型文件，默认名brisque_model.json\n"
+		"	        is_trained：表示是否训练，可以手动改为0从而强制在训练模式中重新训练\n"
+		"	input\n"
+		"		该参数当中不能出现空格，如果出现空格必须用双引号括起\n"
+		"		多个文件以逗号分隔，处理方式如下\n"
+		"		i.空则为当前目录下所有支持图片(jpg, png, bmp, jpeg)\n"
+		"		ii.目录遍历给定目录下所有支持图片(jpg, png, bmp, jpeg)\n"
+		"		iii.txt则按行遍历其中所有文件名\n"
+		"		iv.xml、yaml、json会尝试按照CrystalSet的格式进行读取\n"
+		"		v.除上述情况外，则遍历给定文件名并输出（如果某个读取失败，对应位置值为 - 1）\n"
+		"		vi.注意，不支持递归搜索。即如果在txt中还有另外的txt和文件夹，将预测失败\n"
+		"	output\n"
+		"		输出为csv文件，格式：路径，分数\n"
+		"		如果是crystalset，则会单独生成一个结果文件。格式：路径，结果文件路径\n"
+		"		如果识别错误，则分数为空\n"
+		"		i.非空则输出到指定文件中，无论什么扩展名均以CSV格式保存。格式：文件名, 评分\n"
+		"		ii.空则只输出到控制台\n"
+		;
+}
+
 // 	if (argc > 1)
 // 	{
 // 		switch (argv[1][0])
@@ -566,63 +711,3 @@ int main(int argc, char *argv[])
 // 			"4.预测BRISQUE\n"
 // 			"~.退出\n" << endl;
 // 	}
-
-}
-QStringList ExpandFilenames(QStringList paths)
-{
-	QStringList filenames;
-	for (auto path : paths)
-	{
-		QFileInfo fileInfo(path);
-		if (fileInfo.isDir())//目录，遍历给定目录下所有支持图片(jpg,png,bmp,jpeg)
-		{
-			QDir dir(fileInfo.filePath());
-			auto result = dir.entryList(
-				QStringList{ "*.png","*.jpg","*.jpeg","*.bmp", },
-				QDir::Files, QDir::SortFlag::Name);
-			qDebug() << QStringLiteral("文件夹:") << fileInfo.filePath() << endl
-				<< QStringLiteral("总数:") << result.size();
-			for (auto &r : result)
-				r = dir.filePath(r);
-			filenames.append(result);
-		}
-		else if (fileInfo.isFile() && fileInfo.suffix().toLower() == "txt")//txt，txt则按行遍历其中所有文件名
-		{
-			QFile f(path);
-			if (!f.open(QIODevice::OpenModeFlag::ReadOnly | QIODevice::OpenModeFlag::Text))
-				continue;
-			QTextStream ts(&f);
-			while (ts.atEnd() == false)
-			{
-				auto line = ts.readLine();
-				if (line.isEmpty() == false)
-					filenames.append(ts.readLine());
-			}
-		}
-		else//其余情况直接加入filenames（引号会被命令行程序自动去掉）
-			filenames.append(path);
-	}
-	return filenames;
-}
-
-const char *CONST_CHAR_ModifyDmosPythonContent()
-{
-return
-"import os\n\
-\n\
-dir = os.path.abspath(os.path.curdir)\n\
-f = open(os.path.join(dir, 'dmos.txt'), 'r')\n\
-content = []\n\
-if f:\n\
-    for line in f:\n\
-        sep = '/'\n\
-        if line.count('\\\\') > 0:\n\
-            sep = '\\\\'\n\
-        content.append(os.path.join(dir, line.split(sep)[-1]))\n\
-    f.close()\n\
-\n\
-if len(content)>0:\n\
-    f = open(os.path.join(dir, 'dmos.txt'), 'w')\n\
-    f.writelines(content)\n\
-    f.close()";
-}
