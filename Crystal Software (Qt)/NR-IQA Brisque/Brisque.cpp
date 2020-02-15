@@ -279,7 +279,10 @@ cv::Mat Brisque::Predict(cv::InputArray src) const
 			break;
 		}
 		for (auto img : imgs)
+		{
+			CV_Assert(CheckAvailable(img));
 			result.push_back(psvm->predict(ComputeBrisqueFeature(img)));
+		}
 	}
 	catch (cv::Exception &e)
 	{
@@ -294,7 +297,7 @@ cv::Mat Brisque::Predict(std::string filename) const
 	{
 		std::string suffix = filename.substr(filename.find_last_of('.'), 1);
 
-		if (suffix == "xml" || suffix == "yaml" || suffix == "json")//是CrystalSet形式
+		if (suffix == "crystalset")//是CrystalSet形式
 		{
 			CV_Assert(!(suffix == "xml" || suffix == "yaml" || suffix == "json"));
 		}
@@ -409,7 +412,7 @@ void Brisque::AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsig
 
 cv::Mat Brisque::ComputeBrisqueFeature(const cv::Mat& orig)
 {
-	if (orig.rows <= 5 && orig.cols <= 5)
+	if (CheckAvailable(orig) == false)
 		return cv::Mat(BRISQUE_FEATURE_LENGTH, 1, BRISQUE_MAT_TYPE, cv::Scalar(0));
 	cv::Mat orig_bw;
 	// convert to grayscale 

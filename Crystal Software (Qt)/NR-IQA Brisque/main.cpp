@@ -1,9 +1,8 @@
 ﻿#include "stdafx.h"
 
-#include <QDir>
-#include <QFile>
-#include <QtConcurrent>
-#include <set>
+#include <QtCore\QDir>
+#include <QtCore\QFile>
+#include <QtConcurrent\QtConcurrent>
 
 #include "Brisque.h"
 #include "Crystal.h"
@@ -16,7 +15,10 @@ using namespace std;
 //其它类型则直接加入
 QStringList ExpandFilenames(QStringList paths);
 
-
+void Predict_CrystalSet_Reduce(QStringList &result, const QString &s)
+{
+	result.append(s);
+}
 const char *CONST_CHAR_ModifyDmosPythonContent();
 const char *CONST_CHAR_CommanLineParserAboutMessage();
 int main(int argc, char *argv[])
@@ -308,15 +310,26 @@ int main(int argc, char *argv[])
 		}
 		else if (mode == "3" || mode == "update")
 		{
-			//update csv "d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Image_Path_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Info_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\fig_batch1" "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset"
-			CrystalSetManager::UpdateCSV(input.split(',')[0].toStdString(),
-				input.split(',')[1].toStdString(), output.toStdString(), 
-				input.split(',')[2].toStdString());
+			if (setting.toLower() == "csv")
+			{
+				//update csv "d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Image_Path_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\olddata\Crystals_Info_1.csv","d:\Users\yyx11\Desktop\Saved Pictures\fig_batch1" "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset"
+				CrystalSetManager::UpdateCSV(input.split(',')[0].toStdString(),
+					input.split(',')[1].toStdString(), output.toStdString(),
+					input.split(',')[2].toStdString());
+			}
+			else if (setting.toLower() == "update_dir")
+			{
+				//update update_dir "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset","d:\Users\yyx11\Desktop\Saved Pictures\fig_batch1" "d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset"
+				CrystalSetManager::UpdateDir(input.split(',')[0].toStdString(),
+					input.split(',')[1].toStdString());
+			}
+			else
+				std::cout << "setting [" << setting.toStdString() << "] is not support" << endl;
 		}
 		else//预测模式
 		{			
 			//=====加载模型和命令行=====
-			//predict "d:\Users\yyx11\Desktop\Saved Pictures\brisque.json" "d:\Users\yyx11\Desktop\Saved Pictures\Crystal_   0.png","d:\Users\yyx11\Desktop\Saved Pictures\Crystal_   1.png","d:\Users\yyx11\Desktop\Saved Pictures\FileNames.txt","d:\Users\yyx11\Desktop\Saved Pictures"  "d:\Users\yyx11\Desktop\Saved Pictures\result.txt"
+			//predict "d:\Users\yyx11\Desktop\Saved Pictures\brisque.json" "d:\Users\yyx11\Pictures\lovewallpaper\1.jpg","d:\Users\yyx11\Desktop\Saved Pictures\first.crystalset","d:\Users\yyx11\Desktop\Saved Pictures\FileNames.txt","d:\Users\yyx11\Desktop\Saved Pictures"  "d:\Users\yyx11\Desktop\Saved Pictures\result.txt"
 			Brisque brisque;
 			CV_Assert(brisque.Load(setting.toStdString()) == true);
 
@@ -341,8 +354,7 @@ int main(int argc, char *argv[])
 				cv::Mat img = cv::imread(filename.toStdString(), cv::IMREAD_GRAYSCALE);
 				if (img.empty() == false) 
 				{
-					auto result = brisque.Predict(img);
-					results[i] = QString::number(result.at<BRISQUE_ELEMENT_TYPE>(0));
+					results[i] = QString::number(cv::mean(brisque.Predict(img))[0]);
 					usedTime1 += cv::getTickCount() - timeBegin;
 					qDebug() << filename << "\t" << results[i] << "\t"
 						<< (cv::getTickCount() - timeBegin) * 1000 / cv::getTickFrequency() << "ms" << endl;
@@ -350,14 +362,78 @@ int main(int argc, char *argv[])
 				else
 					qDebug() << filename << "\t" << "[Error]" << endl;				
 			}
-			//TODO:=====计算CrystalSet形式=====
+			//=====计算CrystalSet形式=====
 			for (auto i = 0; i < fileAmount; i++)
 			{
 				auto filename = filenames[i];
-				if (results[i].isEmpty() == false 
-					&& filename.section('.', -1, -1).toLower()=="crystalset")
+				if (results[i].isEmpty() == true 
+					&& QFileInfo(filename).suffix().toLower()=="crystalset")
 				{
-					qDebug() << filename << "\t" << "will support soon!" << endl;
+					qDebug() << filename;
+					CrystalSetManager manager;
+					CV_Assert( manager.Load(filename.toStdString()));
+					qDebug() << QStringLiteral("  包含图片：") << manager.size();
+
+					QFile f(QFileInfo(output).dir().filePath(
+						QFileInfo(output).baseName() + "_" + QFileInfo(filename).baseName() + ".txt"));
+					CV_Assert(f.open(QIODevice::OpenModeFlag::WriteOnly | QIODevice::OpenModeFlag::Text));
+										
+					QTextStream ts(&f);
+					auto vccs = manager.Read(0);
+					std::function<QString(const CommonCrystalSet& ccs)>fmap = 
+						[&brisque](const CommonCrystalSet& ccs)->QString
+					{
+						QString result;
+						for (auto k = 0; k < ccs.size(); k++)
+						{
+							auto img = const_cast<CommonCrystalSet&>(ccs)[k].Image();							
+							if (img.empty() == false)
+							{
+								auto score = brisque.Predict(img);
+								if (score.empty() == false)
+									result += QString::number(cv::mean(score)[0]);
+								else
+									qDebug() << "Error in" << QString::fromStdString(ccs.path()) << k;
+							}
+							result += ',';
+						}
+						const_cast<CommonCrystalSet&>(ccs).ReleaseImg();
+						if (result.isEmpty() == false && result.back() == ',')result.chop(1);
+						return result;
+					};
+					//这里的编译器类型自动推导有问题，fmap必须先显式声明，reduce不能写成lambda
+					//此外，需要使用迭代器形式而非直接使用vccs，因为CommonCrystalSet没有默认的构造和复制函数
+					//在surface pro 4上测试，17367图片耗时299s，提速约10倍
+					auto future = QtConcurrent::mappedReduced(vccs.begin(), vccs.end(),
+						fmap, Predict_CrystalSet_Reduce, QtConcurrent::OrderedReduce | QtConcurrent::SequentialReduce);
+					
+					while (future.isRunning() == true)
+					{
+						cout << future.progressValue() << '/' << future.progressMaximum() << endl;
+						QThread::msleep(1000);
+					}
+
+					auto rsl = future.result();
+					for (auto j = 0; j < rsl.size(); j++)
+						ts << j << ',' << rsl[j] << endl;
+// 					for (auto j = 0; j < vccs.size(); j++)
+// 					{
+// 						if (j % 100 == 0)
+// 							std::cout << j << '/' << manager.size() << endl;;
+// 						auto &ccs = vccs[j];
+// 						for (auto k = 0; k < ccs.size(); k++)
+// 						{
+// 							auto img = ccs[k].Image();
+// 							auto score = brisque.Predict(img);
+// 							if (score.empty() == false)
+// 								ts << j << '_' << k << ',' << cv::mean(score)[0] << endl;
+// 							else
+// 								ts << j << '_' << k << ',' << endl;
+// 						}
+// 						ccs.ReleaseImg();
+// 					}
+					f.close();
+					results[i] = f.fileName();
 				}
 			}
 			//写入output

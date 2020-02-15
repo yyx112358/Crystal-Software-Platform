@@ -100,7 +100,7 @@ bool CrystalSetManager::Load(std::string path)
 		fread(fbuf, 1, next_fptr - fptr - FPTR_WIDTH - 1, f);
 		fptr = next_fptr;
 	}
-	
+	Seek(0);
 	return true;
 }
 
@@ -288,9 +288,14 @@ bool CrystalSetManager::SaveAll(const std::vector<CommonCrystalSet>&vccs, std::s
 	return true;
 }
 
-bool CrystalSetManager::Update(std::string oldpath)
+
+bool CrystalSetManager::UpdateDir(std::string path, std::string newdir)
 {
-	return false;
+	CrystalSetManager manager;
+	if (manager.Load(path) == false)
+		return false;
+	manager._dir = newdir;
+	return manager.Load(newdir);
 }
 
 bool CrystalSetManager::UpdateCSV(std::string pathfile, std::string infofile, std::string outfile, std::string dir)

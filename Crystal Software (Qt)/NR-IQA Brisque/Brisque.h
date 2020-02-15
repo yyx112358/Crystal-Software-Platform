@@ -46,6 +46,7 @@ public:
 
 	bool isDisplay = true;
 	bool isTrained()const { return psvm.empty() == false && psvm->isTrained() == true; }
+	
 
 	static double Alg_SROCC();
 	static cv::Mat CalcMSCN(cv::Mat inputImg);
@@ -53,6 +54,7 @@ public:
 	static void AGGDfit(const cv::Mat&structdis, double& lsigma_best, double& rsigma_best, double& gamma_best);
 	//计算BRISQUE特征向量（输出BRISQUE_MAT_TYPE类型行向量）
 	static cv::Mat ComputeBrisqueFeature(const cv::Mat& orig);
+	static bool CheckAvailable(const cv::Mat &img) { return img.rows > 5 && img.cols > 5; } //检查图像是否能被读取
 
 	cv::Ptr<cv::ml::SVM> psvm;
 	std::vector<double> lowerRange, upperRange;

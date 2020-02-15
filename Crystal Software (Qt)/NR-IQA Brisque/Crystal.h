@@ -80,6 +80,7 @@ protected:
 //	不追求极致性能优化，string等随意使用。预计规模30000图片，100 0000晶体，约100M文本文件
 //	原则上，这个类是只读的。而static函数Save()和Update()负责写。不建议多线程操作，既不安全，也不效率
 //	扩展名crystalset
+//  性能测试：Release模式下读取耗时800ms左右（文件大小24MB，含17367集合和530000晶体，使用surface pro 4测试）
 class CrystalSetManager
 {
 public:
@@ -105,7 +106,7 @@ public:
 		size_t begin = 0, size_t end = 999999999);
 	static bool SaveSieve(const std::vector<CommonCrystalSet>&vccs, std::string filename, 
 		std::function<bool(const CommonCrystalSet&)>f);
-	static bool Update(std::string oldpath);
+	static bool UpdateDir(std::string path,std::string newdir);
 	static bool UpdateCSV(std::string pathfile, std::string infofile, std::string outfile,std::string dir);
 
 	size_t Pos() const { return _nodeIdx; }
