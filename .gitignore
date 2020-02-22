@@ -328,3 +328,5 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+/Crystal Software (Qt)/NR-IQA Brisque Python Module/opencv_world420.dll
+/Crystal Software (Qt)/NR-IQA Brisque Python Module/PyCrystal.pyd
