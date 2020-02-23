@@ -30,6 +30,9 @@
     <ClInclude Include="MatWarpper.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\NR-IQA Brisque\Crystal.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -41,9 +44,15 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\NR-IQA Brisque\Crystal.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="test_pyd.bat">
+      <Filter>源文件</Filter>
+    </None>
+    <None Include="test_pyd.py">
       <Filter>源文件</Filter>
     </None>
   </ItemGroup>

@@ -1,6 +1,11 @@
 #include "stdafx.h"
 #include "Crystal.h"
 #include <opencv2/imgproc.hpp>
+//#include <opencv2\core\persistence.hpp>
+#include <opencv2\imgproc.hpp>
+#include <opencv2\imgcodecs.hpp>
+
+#include <iostream>
 
 using namespace std;
 
@@ -20,7 +25,7 @@ cv::Rect Crystal::Region()
 Crystal& CommonCrystalSet::operator[](size_t id)
 {
 	CV_Assert(id < size());
-	if (_originImage == nullptr) 
+	if (_originImage == nullptr || _crystals[id]._originImage.expired() == true)
 	{
 		for (auto &c : _crystals)
 			c._originImage = OriginImg();
@@ -67,7 +72,8 @@ char* myGetCommaSegment(FILE*f, char*buf)
 bool CrystalSetManager::Load(std::string path)
 {
 	Clear();
-	f = fopen(path.c_str(), "rb");
+	fopen_s(&f, path.c_str(), "rb");//f = fopen(path.c_str(), "rb");
+	
 	if (f == nullptr)
 		return false;
 	
@@ -136,14 +142,14 @@ CommonCrystalSet CrystalSetManager::Get()
 	CV_Assert(IsEnd() == false && IsOpen() == true && ftell(f) == _searchTbl[_nodeIdx]);
 	
 	char buf[0xFFFF];
-	auto length = 0;
+	size_t length = 0;
 	if (_nodeIdx + 1 < size())
 		length = _searchTbl[_nodeIdx + 1] - _searchTbl[_nodeIdx];
 	else
 	{
 		fseek(f, 0, SEEK_END);
 		length = ftell(f) - _searchTbl[_nodeIdx];
-		fseek(f, _searchTbl[_nodeIdx], SEEK_SET);
+		fseek(f, static_cast<long>(_searchTbl[_nodeIdx]), SEEK_SET);
 	}
 	buf[fread(buf, 1, length, f)] = '\0';
 	_nodeIdx++;
@@ -216,7 +222,7 @@ bool CrystalSetManager::Seek(size_t idx)
 	if (IsEnd() == false && IsOpen() == true)
 	{
 		_nodeIdx = idx;
-		fseek(f, _searchTbl[idx], SEEK_SET);
+		fseek(f, static_cast<long>(_searchTbl[idx]), SEEK_SET);
 		return true;
 	}
 	else
@@ -239,7 +245,9 @@ bool CrystalSetManager::SaveAll(const std::vector<CommonCrystalSet>&vccs, std::s
 #endif
 #undef FPTR_WIDTH
 	auto tmpfilename = filename + ".tmp";
-	FILE*f = fopen(tmpfilename.c_str(), "wb+");//创建临时文件。写入成功后，将在函数末尾替换原文件
+	FILE*f = nullptr;
+	fopen_s(&f, tmpfilename.c_str(), "wb+");
+	//FILE*f = fopen_s(tmpfilename.c_str(), "wb+");//创建临时文件。写入成功后，将在函数末尾替换原文件
 	if (f == nullptr)
 		return false;
 

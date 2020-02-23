@@ -1,10 +1,8 @@
 #pragma once
 
-//#include <opencv2\core\mat.hpp>
-//#include <opencv2\core\persistence.hpp>
-//#include <opencv2\imgproc\imgproc.hpp>
+#include <opencv2\core\mat.hpp>
 #include <vector>
-#include <memory>
+#include <functional>
 
 typedef std::vector<cv::Point>contour_t;
 #define NAME2STR(name) #name
@@ -113,6 +111,8 @@ public:
 	bool IsOpen()const { return f != nullptr; }
 	bool IsEnd()const { return _nodeIdx >= size(); }
 	size_t size()const { return _searchTbl.size(); }
+	std::string GetDir()const { return _dir; }
+	void SetDir(std::string newDir) { _dir = newDir; }
 
 	const static uint32_t PROGRAM_VERSION;
 	const static size_t FPTR_WIDTH;	
