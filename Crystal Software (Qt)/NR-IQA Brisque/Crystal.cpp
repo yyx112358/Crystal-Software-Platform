@@ -6,6 +6,7 @@
 #include <opencv2\imgcodecs.hpp>
 
 #include <iostream>
+#include <regex>
 
 using namespace std;
 
@@ -22,6 +23,13 @@ cv::Rect Crystal::Region()
 	return _originRegion;
 }
 
+std::string to_string(Crystal&c)
+{
+	auto rect = c.Region();
+	std::string("Crystal of Region ") + "[" + std::to_string(rect.width) + " x " + std::to_string(rect.height)
+		+ " from (" + std::to_string(rect.x) + ", " + std::to_string(rect.y) + ")]";
+}
+
 Crystal& CommonCrystalSet::operator[](size_t id)
 {
 	CV_Assert(id < size());
@@ -35,9 +43,39 @@ Crystal& CommonCrystalSet::operator[](size_t id)
 
 std::shared_ptr<cv::Mat> CommonCrystalSet::OriginImg()
 {
-	if (_originImage == nullptr || _originImage->empty() == true)
+	if (_originImage == nullptr || _originImage->empty() == true) 
+	{
 		_originImage = std::make_shared<cv::Mat>(cv::imread(_imgPath));
+		for (auto &c : _crystals)
+			c._originImage = OriginImg();
+	}
 	return _originImage;
+}
+
+
+std::chrono::system_clock::time_point CommonCrystalSet::GetCaptureTime() const
+{
+	CV_Assert(0 && "Not Implement");
+	//static std::regex re("\\d-\\d-\\d \\dhh \\dmin \\dsec\\dms",std::regex::)
+}
+
+cv::Mat CommonCrystalSet::DrawCrystals()
+{
+	cv::Mat disp;
+	if (disp.channels() == 1)
+		cv::cvtColor(*OriginImg(), disp, cv::COLOR_GRAY2BGR);
+	else
+		disp = OriginImg()->clone();
+
+	auto cts = GetContours();
+	for (auto i=0;i<cts.size();i++)
+	{
+		cv::Scalar_<uint8_t> color;
+		color.randu(0, 255);
+		cv::drawContours(disp, cts, i, color, 3);
+		cv::putText(disp, std::to_string(i), cts[i].front(), cv::FONT_HERSHEY_COMPLEX, 1, color, 2);
+	}
+	return disp;
 }
 
 #include <fstream>
@@ -123,6 +161,25 @@ std::vector<CommonCrystalSet> CrystalSetManager::Read(size_t begin, size_t end /
 		vccs.push_back(Get());
 	return vccs;
 }
+
+std::vector<CommonCrystalSet> CrystalSetManager::Read(std::function<bool(const CommonCrystalSet&)>filterFunction, size_t begin, size_t end /*= 999999999*/)
+{
+	std::vector<CommonCrystalSet>vccs;
+	if (f == nullptr || begin >= size() || begin >= end)//左闭右开区间
+		return vccs;
+	if (end > _searchTbl.size())end = size();
+
+	//TODO:超大文件拆分和并行化
+	Seek(begin);
+	for (auto i = begin; i < end; i++) 
+	{
+		auto &&ccs = Get();
+		if (filterFunction(ccs) == true)
+			vccs.push_back(ccs);
+	}
+	return vccs;
+}
+
 //从buf+offset开始读取，直到遇到下一个','或'\n'
 //修改','或'\n'为'\0'，返回这一个段的开头，buf+offset将被指向下一个段开头
 //使用该函数可以简化csv文件的读取，每调用一次atoi(myGetCommaSegment(buf,offset);即可读取一个数字，参考Get()
@@ -213,13 +270,13 @@ CommonCrystalSet CrystalSetManager::Get()
 // 		}
 	}
 	CV_Assert(_nodeIdx - 1 == nodeIdx && crystalAmount == ccs.size());
-
+	
 	return ccs;
 }
 
 bool CrystalSetManager::Seek(size_t idx)
 {
-	if (IsEnd() == false && IsOpen() == true)
+	if (IsOpen() == true && idx < _searchTbl.size())
 	{
 		_nodeIdx = idx;
 		fseek(f, static_cast<long>(_searchTbl[idx]), SEEK_SET);
