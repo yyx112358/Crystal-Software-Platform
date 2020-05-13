@@ -7,6 +7,9 @@
 #include "Brisque.h"
 #include "Crystal.h"
 
+#include "BRISQUE_Assess.h"
+#include <QApplication>
+
 using namespace std;
 
 //遍历paths，展开文件名【不检查文件有效性，不递归搜索】
@@ -20,6 +23,7 @@ void Predict_CrystalSet_Reduce(QStringList &result, const QString &s)
 	result.append(s);
 }
 const char *CONST_CHAR_ModifyDmosPythonContent();
+const char *CONST_CHAR_CreateEmptyDmosPythonContent();
 const char *CONST_CHAR_CommanLineParserAboutMessage();
 int main(int argc, char *argv[])
 {
@@ -293,6 +297,11 @@ int main(int argc, char *argv[])
 				f.open(QIODevice::WriteOnly | QIODevice::Text);
 				f.write(CONST_CHAR_ModifyDmosPythonContent());
 				f.close();
+				//写入新建dmos脚本
+				f.setFileName(dir.filePath(QStringLiteral("生成空白dmos.py")));
+				f.open(QIODevice::WriteOnly | QIODevice::Text);
+				f.write(CONST_CHAR_ModifyDmosPythonContent());
+				f.close();
 			}
 			else
 			{
@@ -325,6 +334,14 @@ int main(int argc, char *argv[])
 			}
 			else
 				std::cout << "setting [" << setting.toStdString() << "] is not support" << endl;
+		}
+		else if (mode == "4" || mode == "assess")//测试
+		{
+			QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+			QApplication a(argc, argv);
+			auto w = new BRISQUE_Assess(setting,input,output,nullptr);
+			w->show();
+			return a.exec();
 		}
 		else//预测模式
 		{			
@@ -523,6 +540,22 @@ if len(content)>0:\n\
     f.writelines(content)\n\
     f.close()";
 }
+
+const char * CONST_CHAR_CreateEmptyDmosPythonContent()
+{
+return
+"import os\
+\
+filename = 'dmos.txt'\
+if (os.path.exists(filename)) :\
+	filename += '.tmp'\
+	imgs = [os.path.abspath(f) for f in os.listdir(r'.') if os.path.splitext(f)[-1].lower() in('.jpg', '.png', '.bmp')]\
+\
+	with open(filename, 'w') as f :\
+f.write(',\\n'.join(imgs) + ',')";
+}
+
+
 
 const char * CONST_CHAR_CommanLineParserAboutMessage()
 {

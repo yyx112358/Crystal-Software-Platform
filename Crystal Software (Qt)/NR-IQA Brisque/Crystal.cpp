@@ -26,7 +26,7 @@ cv::Rect Crystal::Region()
 std::string to_string(Crystal&c)
 {
 	auto rect = c.Region();
-	std::string("Crystal of Region ") + "[" + std::to_string(rect.width) + " x " + std::to_string(rect.height)
+	return std::string("Crystal of Region ") + "[" + std::to_string(rect.width) + " x " + std::to_string(rect.height)
 		+ " from (" + std::to_string(rect.x) + ", " + std::to_string(rect.y) + ")]";
 }
 

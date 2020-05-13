@@ -57,6 +57,9 @@ public:
 	CommonCrystalSet(CommonCrystalSet&& another)
 		:_imgPath(std::move(another._imgPath)),_crystals(std::move(another._crystals)),
 		_originImage(std::move(another._originImage)) {}
+	CommonCrystalSet(const CommonCrystalSet& another)//TODO:不确定这样做对不对（将const T&传递给std::move())
+		:_imgPath(std::move(another._imgPath)), _crystals(std::move(another._crystals)),
+		_originImage(std::move(another._originImage)) {}
 	
 	std::string path()const { return _imgPath; }
 	size_t size()const { return _crystals.size(); }
