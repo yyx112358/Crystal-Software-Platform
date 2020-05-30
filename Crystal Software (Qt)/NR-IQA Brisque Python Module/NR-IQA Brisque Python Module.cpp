@@ -7,35 +7,15 @@
 
 #include "MatWarpper.h"
 #include "..\NR-IQA Brisque\Crystal.h"
+#include "..\NR-IQA Brisque\Brisque.h"
 
-#include <opencv2/highgui/highgui.hpp>
-
-void testim(py::array& input)
-{
-	auto m = Numpy2Mat(input);
-	cv::imshow("", m);
-	cv::waitKey();
-}
-#include <opencv2\imgproc.hpp>
-py::array testreturn(py::array& input)
-{
-	auto m = Numpy2Mat(input);
-	cv::cvtColor(m, m, cv::COLOR_BGR2GRAY);
-	cv::threshold(m, m, 0, 255, cv::THRESH_OTSU | cv::THRESH_BINARY);
-	return Mat2Numpy(m({ cv::Range(100,400),cv::Range(100,400) }));
-}
 
 PYBIND11_MODULE(PyCrystal, m) {
 
 	m.doc() = "pybind11 example module";
 
 	// Add bindings here
-	m.def("foo", []() {
-		return "Hello, World!";
-	});
-	m.def("testim", &testim);
 	using namespace pybind11::literals;//用来支持_a
-	m.def("testreturn", &testreturn,"test return","img"_a);//默认值写作"a"_a=1
 	
 	py::class_<Crystal>(m, NAME2STR(Crystal))
 		.def(py::init<>())
@@ -79,4 +59,17 @@ PYBIND11_MODULE(PyCrystal, m) {
 		.def("GetDir", &CrystalSetManager::GetDir)
 		.def("SetDir", &CrystalSetManager::SetDir,"newdir"_a)
 		.def("__len__", &CrystalSetManager::size);
+
+	py::class_<Brisque>(m, NAME2STR(Brisque))
+		.def(py::init<>())
+		.def("Load", &Brisque::Load, "settingPath"_a)
+		.def("Save", &Brisque::Save, "settingPath"_a = ".\\brisque.json", "modelPath"_a = ".\\brisque_model.json", py::const_)
+		.def("Clear", &Brisque::Clear)
+		.def("Train", py::overload_cast<const cv::Mat&, const cv::Mat&>(&Brisque::Train), "featureMat"_a, "dmosMat"_a)
+		.def("Train", py::overload_cast<std::string, std::string>(&Brisque::Train), "featurePath"_a, "dmosPath"_a)
+		.def("Train", py::overload_cast<std::vector<std::string>, std::string>(&Brisque::Train), "featurePaths"_a, "dmosPath"_a)
+		.def("Predict", py::overload_cast<cv::InputArray>(&Brisque::Train), "img"_a, py::const_)
+		.def("Predict", py::overload_cast<std::string>(&Brisque::Train), "filename"_a, py::const_)
+		.def("isTrained", &Brisque::isTrained, py::const_);
+
 }

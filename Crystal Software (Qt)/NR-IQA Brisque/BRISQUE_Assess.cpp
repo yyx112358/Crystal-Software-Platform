@@ -5,6 +5,7 @@
 #include <QFileDialog>
 
 QPixmap Mat2QPixmap(cv::Mat m);
+QPixmap GetImage(std::string filename, int expandLevel = rand()%8);
 
 BRISQUE_Assess::BRISQUE_Assess(QString setting, QString input, QString output, QWidget *parent)
 	: QMainWindow(parent),_inputDir(input),_outputFile(output)
@@ -108,11 +109,11 @@ void BRISQUE_Assess::Next()
 	QString leftName = dir.absoluteFilePath(_filenames[(_nextIdx++) % _filenames.size()]),
 		rightName = dir.absoluteFilePath(_filenames[(_nextIdx++) % _filenames.size()]);
 
-	ui.label_Left->setPixmap(Mat2QPixmap(cv::imread(leftName.toStdString(),cv::IMREAD_GRAYSCALE)));
+	ui.label_Left->setPixmap(GetImage(leftName.toStdString()));
 	//ui.label_Left->setProperty("path", leftName);
 	ui.label_Left->setToolTip(leftName);
 
-	ui.label_Right->setPixmap(Mat2QPixmap(cv::imread(rightName.toStdString(), cv::IMREAD_GRAYSCALE)));
+	ui.label_Right->setPixmap(GetImage(rightName.toStdString()));
 	//ui.label_Right->setProperty("path", rightName);
 	ui.label_Right->setToolTip(rightName);
 
@@ -183,3 +184,16 @@ QPixmap Mat2QPixmap(cv::Mat m)
 			.copy(0, 0, m.cols, m.rows);
 	}
 }
+
+QPixmap GetImage(std::string filename, int expandLevel /*= rand()%8*/)
+{
+	cv::Mat img = cv::imread(filename, cv::IMREAD_GRAYSCALE);
+	//扩展，对第j张，如果j是奇数，则垂直翻转;如果j>>1为1、2、3，则旋转90/180/270
+	if (expandLevel & 0x01 == 1)cv::flip(img, img, 0);
+	if (expandLevel >> 1 == 1)cv::rotate(img, img, cv::ROTATE_90_CLOCKWISE);
+	else if (expandLevel >> 1 == 2)cv::rotate(img, img, cv::ROTATE_180);
+	else if (expandLevel >> 1 == 3)cv::rotate(img, img, cv::ROTATE_90_COUNTERCLOCKWISE);
+
+	return Mat2QPixmap(img);
+}
+

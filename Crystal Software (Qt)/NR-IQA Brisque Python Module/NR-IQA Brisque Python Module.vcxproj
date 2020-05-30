@@ -167,6 +167,7 @@ python -i ..\..\..\test_pyd.py</Command>
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\NR-IQA Brisque\Brisque.h" />
     <ClInclude Include="..\NR-IQA Brisque\Crystal.h" />
     <ClInclude Include="MatWarpper.h" />
     <ClInclude Include="NR-IQA Brisque Python Module.h" />
@@ -174,6 +175,7 @@ python -i ..\..\..\test_pyd.py</Command>
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\NR-IQA Brisque\Brisque.cpp" />
     <ClCompile Include="..\NR-IQA Brisque\Crystal.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
