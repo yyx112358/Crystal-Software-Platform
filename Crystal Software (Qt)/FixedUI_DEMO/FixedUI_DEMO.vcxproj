@@ -33,6 +33,7 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\OpenCV Debug 4-2-0 VC14 X64.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -93,7 +94,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CustomTypes.cpp" />
     <ClCompile Include="FixedUI_DEMO.cpp" />
+    <ClCompile Include="ImageLoader_Dir.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -101,12 +104,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <QtMoc Include="ImageLoader_Dir.h" />
+    <ClInclude Include="CustomTypes.h" />
+    <QtMoc Include="GraphError.h" />
     <ClInclude Include="Interface_ImageLoader.h" />
     <QtMoc Include="FixedUI_DEMO.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="FixedUI_DEMO.ui" />
+    <QtUic Include="ImageLoader_Dir.ui" />
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="FixedUI_DEMO.qrc" />
