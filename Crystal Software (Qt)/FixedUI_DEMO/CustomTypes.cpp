@@ -3,6 +3,13 @@
 #include "GraphError.h"
 #include <opencv2/imgproc.hpp>
 
+QVariant::Type MatTypeId()
+{
+	const static QVariant::Type type = 
+		static_cast<QVariant::Type>(QVariant::fromValue<cv::Mat>(cv::Mat()).userType());
+	return type;
+}
+
 QString QVariant2Description(QVariant var, int len /*= 31*/)
 {
 	//TODO:之后可能会根据特定类型和不同长度给定制

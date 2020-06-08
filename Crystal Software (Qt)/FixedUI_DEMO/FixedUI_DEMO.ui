@@ -31,12 +31,19 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="action_SelectAlgorithm"/>
+   <addaction name="separator"/>
    <addaction name="actionDebug"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionDebug">
    <property name="text">
     <string>Debug</string>
+   </property>
+  </action>
+  <action name="action_SelectAlgorithm">
+   <property name="text">
+    <string>算法选择</string>
    </property>
   </action>
  </widget>

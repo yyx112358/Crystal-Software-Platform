@@ -1,11 +1,12 @@
 #include "stdafx.h"
 #include "FixedUI_DEMO.h"
-#include "ImageLoader_Dir.h"
 #include <QDebug>
 #include <vld.h>
 #include "GraphError.h"
 #include "CustomTypes.h"
 
+#include "ImageLoader_Dir.h"
+#include "ParamViewer.h"
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;
 
@@ -17,13 +18,40 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 	auto pimageLoader_Dir = QSharedPointer<ImageLoader_Dir>::create(this);
 	_imageLoaders.append(pimageLoader_Dir);
 	this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get());
+
+	_paramViewer=new ParamViewer(this);
+	this->addDockWidget(Qt::RightDockWidgetArea, _paramViewer);
+
 	connect(ui.actionDebug, &QAction::triggered, this, &FixedUI_DEMO::Debug);
+	connect(ui.action_SelectAlgorithm, &QAction::triggered, [this](bool b)
+	{
+		SelectAlgorithm("");
+	});
 }
 
 FixedUI_DEMO::~FixedUI_DEMO()
 {
 	_imageLoaders.clear();
 }
+
+
+void FixedUI_DEMO::SelectAlgorithm(QString name)
+{
+	auto m = QVariant::fromValue(cv::Mat());
+	auto n = m.typeName();
+	auto i = m.userType();
+	auto k = QVariant::nameToType(n);
+	auto b = m.canConvert(i), b2 = m.canConvert(k);
+
+	_paramViewer->AddParam(ParamView::PARAMETER, "threshold", QVariant::Int, QStringLiteral("ãÐÖµ"));
+	_paramViewer->AddParam(ParamView::PARAMETER, "threshold1", QVariant::Int, QStringLiteral("ãÐÖµ"),7);
+	_paramViewer->AddParam(ParamView::PARAMETER, "isDisplay", QVariant::Bool, QStringLiteral("ãÐÖµ"),false);
+	_paramViewer->AddParam(ParamView::PARAMETER, "offset", QVariant::Point, QStringLiteral("ãÐÖµ"), QPoint(3,3));
+	_paramViewer->AddParam(ParamView::INPUT, "input", MatTypeId(), QStringLiteral("ÊäÈëÍ¼Ïñ"));
+	
+	_paramViewer->AddParam(ParamView::OUTPUT, "output", MatTypeId(), QStringLiteral("Êä³öÍ¼Ïñ"),QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3,4,CV_8U))) ;
+}
+
 
 #include <opencv2/highgui.hpp>
 void FixedUI_DEMO::Debug()
