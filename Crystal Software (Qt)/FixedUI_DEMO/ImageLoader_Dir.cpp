@@ -5,6 +5,7 @@
 #include "GraphError.h"
 #include "CustomTypes.h"
 #include <opencv2/imgcodecs.hpp>
+#include "MatGraphicsView.h"
 
 ImageLoader_Dir::ImageLoader_Dir(QWidget *parent)
 	: QDockWidget(parent)
@@ -22,6 +23,7 @@ ImageLoader_Dir::ImageLoader_Dir(QWidget *parent)
 	ui.tableWidget->setSelectionBehavior(QTableView::SelectionBehavior::SelectRows);//一次选中一行
 	ui.tableWidget->setEditTriggers(QTableView::EditTrigger::NoEditTriggers);//不可修改
 	ui.tableWidget->resizeColumnsToContents();//列宽随内容变化
+	ui.tableWidget->setStyleSheet("selection-background-color:lightblue;");
 
 	connect(ui.toolButton_Add, &QToolButton::clicked, [this]
 	{
@@ -32,6 +34,23 @@ ImageLoader_Dir::ImageLoader_Dir(QWidget *parent)
 	connect(ui.toolButton_Reset, &QToolButton::clicked, [this]
 	{
 		Clear();
+	});
+	connect(ui.tableWidget, &QTableWidget::doubleClicked, [this](const QModelIndex&idx)
+	{		
+		int row = idx.row();
+
+		auto path = GetPath(row);
+		if (path.isEmpty()==false)
+		{
+			cv::Mat img = cv::imread(path.toStdString());
+			if (img.empty() == false)
+			{
+				if (_viewer == nullptr)
+					_viewer.reset(new MatGraphicsview(nullptr));
+				_viewer->SetImg(img);
+				_viewer->show();
+			}
+		}		
 	});
 }
 
@@ -73,12 +92,9 @@ QVariant ImageLoader_Dir::Get(QVariantHash*extraInfo /*= nullptr*/)
 	if (IsOpen() == false || IsEnd() == true)
 		return result;
 
-	auto filename = ui.tableWidget->item(_ptr, COLUMN_FILENAME)->text(),
-		dir = ui.tableWidget->item(_ptr, COLUMN_DIR)->text();
-	QFileInfo info(dir, filename);
-	if (info.exists() == true && info.isFile() == true)
-	{
-		auto path = info.absoluteFilePath();
+	auto path = GetPath(_ptr);
+	if (path.isEmpty()==false)
+	{		
 		cv::Mat img = cv::imread(path.toStdString());
 		if (img.empty() == false) 
 		{
@@ -87,16 +103,20 @@ QVariant ImageLoader_Dir::Get(QVariantHash*extraInfo /*= nullptr*/)
 			{
 				extraInfo->clear();
 				extraInfo->insert("row", _ptr);
-				extraInfo->insert("filename", filename);
-				extraInfo->insert("dir", dir);
 				extraInfo->insert("path", path);
 			}
 		}
 	}
-	if(result.isNull()==false)
+	if (result.isNull() == false) 
+	{
 		ui.tableWidget->item(_ptr, COLUMN_STATUS)->setBackgroundColor(Qt::green);
-	else
+		ui.tableWidget->item(_ptr, COLUMN_STATUS)->setCheckState(Qt::PartiallyChecked);
+	}
+	else 
+	{
 		ui.tableWidget->item(_ptr, COLUMN_STATUS)->setBackgroundColor(Qt::red);
+		ui.tableWidget->item(_ptr, COLUMN_STATUS)->setCheckState(Qt::Unchecked);
+	}
 
 	_ptr++;
 	return result;
@@ -126,6 +146,18 @@ bool ImageLoader_Dir::Seek(size_t idx)
 	}
 	else
 		return false;
+}
+
+QString ImageLoader_Dir::GetPath(size_t idx, bool isCheck/*=true*/) const
+{
+	auto filename = ui.tableWidget->item(idx, COLUMN_FILENAME)->text(),
+		dir = ui.tableWidget->item(idx, COLUMN_DIR)->text();
+	QFileInfo info(dir, filename);
+	if (isCheck == false
+		|| (info.exists() == true && info.isFile() == true && info.size() > 0))
+		return info.absoluteFilePath();
+	else
+		return QString();
 }
 
 int ImageLoader_Dir::size() const

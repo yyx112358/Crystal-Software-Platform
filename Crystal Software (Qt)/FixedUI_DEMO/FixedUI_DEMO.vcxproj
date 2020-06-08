@@ -96,8 +96,14 @@
   <ItemGroup>
     <ClCompile Include="CustomTypes.cpp" />
     <ClCompile Include="FixedUI_DEMO.cpp" />
+    <ClCompile Include="GuiStatusview.cpp" />
+    <ClCompile Include="ImageLoader_Camera.cpp" />
     <ClCompile Include="ImageLoader_Dir.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MatGraphicsView.cpp" />
+    <ClCompile Include="ParamDelegate.cpp" />
+    <ClCompile Include="ParamView.cpp" />
+    <ClCompile Include="ParamViewer.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -107,13 +113,22 @@
     <QtMoc Include="ImageLoader_Dir.h" />
     <ClInclude Include="CustomTypes.h" />
     <QtMoc Include="GraphError.h" />
+    <QtMoc Include="ImageLoader_Camera.h" />
+    <QtMoc Include="GuiStatusview.h" />
     <ClInclude Include="Interface_ImageLoader.h" />
     <QtMoc Include="FixedUI_DEMO.h" />
+    <QtMoc Include="MatGraphicsView.h" />
+    <QtMoc Include="ParamViewer.h" />
+    <QtMoc Include="ParamView.h" />
+    <QtMoc Include="ParamDelegate.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="FixedUI_DEMO.ui" />
+    <QtUic Include="GuiStatusview.ui" />
+    <QtUic Include="ImageLoader_Camera.ui" />
     <QtUic Include="ImageLoader_Dir.ui" />
+    <QtUic Include="ParamViewer.ui" />
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="FixedUI_DEMO.qrc" />

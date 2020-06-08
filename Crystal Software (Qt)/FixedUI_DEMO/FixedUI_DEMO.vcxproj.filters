@@ -26,6 +26,21 @@
     <Filter Include="_Global_">
       <UniqueIdentifier>{32e4019d-ed1c-4965-8435-da1924e29e06}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sub Viewers">
+      <UniqueIdentifier>{be24dad1-c4fb-417a-b1a4-39e253504b30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sub Viewers\ImageLoader">
+      <UniqueIdentifier>{22cf87eb-e8a0-4a6f-8d08-1acac264be91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sub Viewers\StatusViewer">
+      <UniqueIdentifier>{43bffb48-97f0-4ef1-9083-e191c22433c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sub Viewers\ParamViewer">
+      <UniqueIdentifier>{48cfa52d-446d-41be-a68e-8861ba39d98b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Sub Viewers\ImageViewer">
+      <UniqueIdentifier>{743f7986-193a-439f-8d32-47db018e8157}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -37,33 +52,69 @@
     <ClCompile Include="FixedUI_DEMO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ImageLoader_Dir.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="CustomTypes.cpp">
       <Filter>_Global_</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageLoader_Dir.cpp">
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageLoader_Camera.cpp">
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="GuiStatusview.cpp">
+      <Filter>Sub Viewers\StatusViewer</Filter>
+    </ClCompile>
+    <ClCompile Include="MatGraphicsView.cpp">
+      <Filter>Sub Viewers\ImageViewer</Filter>
+    </ClCompile>
+    <ClCompile Include="ParamViewer.cpp">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </ClCompile>
+    <ClCompile Include="ParamDelegate.cpp">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </ClCompile>
+    <ClCompile Include="ParamView.cpp">
+      <Filter>Sub Viewers\ParamViewer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Interface_ImageLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CustomTypes.h">
       <Filter>_Global_</Filter>
+    </ClInclude>
+    <ClInclude Include="Interface_ImageLoader.h">
+      <Filter>Sub Viewers\ImageLoader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="FixedUI_DEMO.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <QtMoc Include="ImageLoader_Dir.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
     <QtMoc Include="GraphError.h">
       <Filter>_Global_</Filter>
+    </QtMoc>
+    <QtMoc Include="ImageLoader_Dir.h">
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </QtMoc>
+    <QtMoc Include="ImageLoader_Camera.h">
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </QtMoc>
+    <QtMoc Include="GuiStatusview.h">
+      <Filter>Sub Viewers\StatusViewer</Filter>
+    </QtMoc>
+    <QtMoc Include="MatGraphicsView.h">
+      <Filter>Sub Viewers\ImageViewer</Filter>
+    </QtMoc>
+    <QtMoc Include="ParamViewer.h">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </QtMoc>
+    <QtMoc Include="ParamDelegate.h">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </QtMoc>
+    <QtMoc Include="ParamView.h">
+      <Filter>Sub Viewers\ParamViewer</Filter>
     </QtMoc>
   </ItemGroup>
   <ItemGroup>
@@ -71,7 +122,16 @@
       <Filter>Form Files</Filter>
     </QtUic>
     <QtUic Include="ImageLoader_Dir.ui">
-      <Filter>Form Files</Filter>
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </QtUic>
+    <QtUic Include="ImageLoader_Camera.ui">
+      <Filter>Sub Viewers\ImageLoader</Filter>
+    </QtUic>
+    <QtUic Include="GuiStatusview.ui">
+      <Filter>Sub Viewers\StatusViewer</Filter>
+    </QtUic>
+    <QtUic Include="ParamViewer.ui">
+      <Filter>Sub Viewers\ParamViewer</Filter>
     </QtUic>
   </ItemGroup>
   <ItemGroup>
