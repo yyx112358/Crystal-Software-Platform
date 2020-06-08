@@ -33,6 +33,8 @@
    </attribute>
    <addaction name="action_SelectAlgorithm"/>
    <addaction name="separator"/>
+   <addaction name="actionRun"/>
+   <addaction name="actionStop"/>
    <addaction name="actionDebug"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -44,6 +46,16 @@
   <action name="action_SelectAlgorithm">
    <property name="text">
     <string>算法选择</string>
+   </property>
+  </action>
+  <action name="actionRun">
+   <property name="text">
+    <string>Run</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="text">
+    <string>Stop</string>
    </property>
   </action>
  </widget>

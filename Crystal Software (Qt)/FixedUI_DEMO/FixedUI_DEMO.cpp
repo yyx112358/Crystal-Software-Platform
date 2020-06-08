@@ -25,7 +25,18 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 	connect(ui.actionDebug, &QAction::triggered, this, &FixedUI_DEMO::Debug);
 	connect(ui.action_SelectAlgorithm, &QAction::triggered, [this](bool b)
 	{
-		SelectAlgorithm("");
+		static int current = 0;
+		bool ok = false;
+		static QStringList algorithms({ QStringLiteral("阈值化分割") ,QStringLiteral("机器学习分割") });
+		QString result = QInputDialog::getItem(this, QStringLiteral("选择算法"), "",
+			algorithms, current, false, &ok);
+		if (ok == true && result.isEmpty() == false) 
+		{
+			for (auto i = 0; i < algorithms.size(); i++)
+				if (algorithms[i] == result)
+					current = i;
+			SelectAlgorithm(result);
+		}
 	});
 }
 
@@ -37,21 +48,24 @@ FixedUI_DEMO::~FixedUI_DEMO()
 
 void FixedUI_DEMO::SelectAlgorithm(QString name)
 {
-	auto m = QVariant::fromValue(cv::Mat());
-	auto n = m.typeName();
-	auto i = m.userType();
-	auto k = QVariant::nameToType(n);
-	auto b = m.canConvert(i), b2 = m.canConvert(k);
+	if(name == QStringLiteral("阈值化分割"))
+	{		
+		_paramViewer->AddParam(ParamView::PARAMETER, "threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
+		_paramViewer->AddParam(ParamView::PARAMETER, "isDisplay", QVariant::Bool, QStringLiteral("阈值"), false);
+		_paramViewer->AddParam(ParamView::PARAMETER, "offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3, 3));
+		
+		_paramViewer->AddParam(ParamView::INPUT, "input", MatTypeId(), QStringLiteral("输入图像"));
 
-	_paramViewer->AddParam(ParamView::PARAMETER, "threshold", QVariant::Int, QStringLiteral("阈值"));
-	_paramViewer->AddParam(ParamView::PARAMETER, "threshold1", QVariant::Int, QStringLiteral("阈值"),7);
-	_paramViewer->AddParam(ParamView::PARAMETER, "isDisplay", QVariant::Bool, QStringLiteral("阈值"),false);
-	_paramViewer->AddParam(ParamView::PARAMETER, "offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3,3));
-	_paramViewer->AddParam(ParamView::INPUT, "input", MatTypeId(), QStringLiteral("输入图像"));
-	
-	_paramViewer->AddParam(ParamView::OUTPUT, "output", MatTypeId(), QStringLiteral("输出图像"),QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3,4,CV_8U))) ;
+		_paramViewer->AddParam(ParamView::OUTPUT, "output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
+		_paramViewer->AddParam(ParamView::OUTPUT, "threshold", QVariant::Int, QStringLiteral("阈值"));
+	}
 }
 
+
+void FixedUI_DEMO::ParseParamAction(QString actionName, ROLE role, QVariantList param, bool checked)
+{
+	if(param[ParamView::TYPE].toInt()==MatTypeId())
+}
 
 #include <opencv2/highgui.hpp>
 void FixedUI_DEMO::Debug()
@@ -64,10 +78,16 @@ void FixedUI_DEMO::Debug()
 		{
 		case 0:
 		{
+			SelectAlgorithm(QStringLiteral("阈值化分割"));
+			}
+		break;
+		case 1:
+		{
 			QSharedPointer<ImageLoader_Dir>pimgLoader = _imageLoaders.back().dynamicCast<ImageLoader_Dir>();
-			GRAPH_ASSERT(pimgLoader->Load({ "d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020-02-10\\2019-01-24 12hh 28min 39sec925ms.Jpeg.13.png",
+			GRAPH_ASSERT(pimgLoader->Load({
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO02_2019-09-22 13hh 48min 41sec475ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 47sec448ms.Jpeg",
+				"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020-02-10\\2019-01-24 12hh 28min 39sec925ms.Jpeg.13.png",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec118ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec784ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 49sec447ms.Jpeg",
@@ -80,21 +100,7 @@ void FixedUI_DEMO::Debug()
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 54sec251ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 54sec936ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 55sec622ms.Jpeg", }));
-		}
-		break;
-		case 1:
-		{
-			QSharedPointer<ImageLoader_Dir>pimgLoader = _imageLoaders.back().dynamicCast<ImageLoader_Dir>();
-			QVariantHash extraInfo;
-			QVariant imgVar = pimgLoader->Get(&extraInfo);
-			qDebug() << extraInfo;
-			GRAPH_ASSERT(imgVar.isNull()==false);
-			cv::Mat img = imgVar.value<cv::Mat>();
-			cv::Mat testimg = cv::imread(extraInfo["path"].toString().toStdString());
-			GRAPH_ASSERT(cv::countNonZero(img != testimg) == 0);
-			cv::imshow(__FUNCTION__, img);
-			cv::waitKey();
-			cv::destroyWindow(__FUNCTION__);
+
 		}
 		break;
 		default:

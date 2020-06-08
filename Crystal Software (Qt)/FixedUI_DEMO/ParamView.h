@@ -32,6 +32,13 @@ public:
 	QVariant GetParam(QString name)const;
 
 	const ROLE _role;
+
+signals:
+	void sig_ActionTriggered(QString actionName, ROLE role, QVariantList param, bool checked);
 private:
 	QStandardItemModel _model;//模型，存储数据用的。如果需要一套模型多个视图则需要将其抽出
+
+protected:
+	virtual void contextMenuEvent(QContextMenuEvent *) override;
+
 };

@@ -5,6 +5,8 @@
 #include <QSharedPointer>
 #include "Interface_ImageLoader.h"
 
+
+enum ROLE;
 class ParamViewer;
 
 class FixedUI_DEMO : public QMainWindow
@@ -18,6 +20,7 @@ public:
 	void Debug();
 	void SelectAlgorithm(QString name);
 
+	void ParseParamAction(QString actionName, ROLE role, QVariantList param, bool checked);
 private:
 	Ui::FixedUI_DEMOClass ui;
 	QList<QSharedPointer<Interface_ImageLoader>>_imageLoaders;
