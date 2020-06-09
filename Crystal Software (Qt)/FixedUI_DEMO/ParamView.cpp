@@ -105,6 +105,45 @@ QVariant ParamView::GetParam(QString name) const
 		return QVariant();
 }
 
+QString ParamView::GetRowName(QStandardItem*item) const
+{
+	if (item == nullptr || item->model() != &_model)
+		return QString();
+	int row = item->row();
+	return _model.item(row, ParamView::NAME)->data(Qt::DisplayRole).toString();
+}
+
+int ParamView::GetRow(QString name) const
+{
+	auto items = _model.findItems(name, Qt::MatchFlag::MatchExactly, COLUMN::NAME);
+	GRAPH_ASSERT(items.size() <= 1);//原则上名称唯一。因此只取第一个
+	if (items.size() == 0)
+		return -1;
+	else
+		return items[0]->row();
+}
+
+QVariant::Type ParamView::GetType(QString name) const
+{
+	int row = GetRow(name);
+	if (row < 0)return QVariant::Invalid;
+	return static_cast<QVariant::Type>(_model.item(row, TYPE)->data(Qt::ItemDataRole::DisplayRole).toInt());
+}
+
+QString ParamView::GetExplaination(QString name) const
+{
+	int row = GetRow(name);
+	if (row < 0)return QString();
+	return _model.item(row, EXPLAINATION)->data(Qt::ItemDataRole::DisplayRole).toString();
+}
+
+QStandardItem* ParamView::GetValueItem(QString name)
+{
+	int row = GetRow(name);
+	if (row < 0)return nullptr;
+	return _model.item(row, EXPLAINATION);
+}
+
 void ParamView::contextMenuEvent(QContextMenuEvent *event)
 {
 	QModelIndex modelIndex = currentIndex();

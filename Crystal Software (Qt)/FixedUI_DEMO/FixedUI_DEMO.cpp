@@ -52,6 +52,7 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 			SelectAlgorithm(result);
 		}
 	});
+	connect(ui.actionRun, &QAction::triggered, this, &FixedUI_DEMO::Run);
 }
 
 FixedUI_DEMO::~FixedUI_DEMO()
@@ -187,6 +188,17 @@ void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVari
 	}
 }
 
+QStandardItemModel* FixedUI_DEMO::_GetModel(int role)
+{
+	if (role != ParamView::INPUT && role != ParamView::OUTPUT && role != ParamView::PARAMETER)
+		return nullptr;
+	auto view = _paramWidgets[role]->view;
+	if (view == nullptr)return nullptr;
+
+	QStandardItemModel*model = qobject_cast<QStandardItemModel*>(_paramWidgets[role]->view->model());
+	return model;
+}
+
 #include <opencv2/highgui.hpp>
 void FixedUI_DEMO::Debug()
 {
@@ -216,17 +228,20 @@ void FixedUI_DEMO::Debug()
 			AddParamLoader(*_paramWidgets[ParamView::INPUT]->view,
 				QStringLiteral(" ‰»Î") + ":" + "input",
 				qobject_cast<QStandardItemModel*>(_paramWidgets[ParamView::INPUT]->view->model())->item(0, ParamView::VALUE));
-			AddParamLoader(*_paramWidgets[ParamView::OUTPUT]->view,
-				QStringLiteral(" ‰≥ˆ") + ":" + "output",
-				qobject_cast<QStandardItemModel*>(_paramWidgets[ParamView::OUTPUT]->view->model())->item(0, ParamView::VALUE));
 		}
 		break;
 		case 3:
 		{
-			QSharedPointer<ImageLoader_Dir>pimgLoader1 = (*_imageLoaders.begin()).dynamicCast<ImageLoader_Dir>(),
-				pimgLoader2 = (*(_imageLoaders.begin() + 1)).dynamicCast<ImageLoader_Dir>();
+			QSharedPointer<ImageLoader_Dir>pimgLoader = (*_imageLoaders.begin()).dynamicCast<ImageLoader_Dir>();
 
-			GRAPH_ASSERT(pimgLoader1->Load({
+			GRAPH_ASSERT(pimgLoader->Load({
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO02_2019-09-22 13hh 48min 41sec475ms.Jpeg",
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 47sec448ms.Jpeg",
+				"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020-02-10\\2019-01-24 12hh 28min 39sec925ms.Jpeg.13.png",
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec118ms.Jpeg",
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec784ms.Jpeg",
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 49sec447ms.Jpeg",
+				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 50sec136ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 50sec820ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 51sec505ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 52sec193ms.Jpeg",
@@ -235,22 +250,11 @@ void FixedUI_DEMO::Debug()
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 54sec251ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 54sec936ms.Jpeg",
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 55sec622ms.Jpeg", }));
-			GRAPH_ASSERT(pimgLoader2->Load({
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO02_2019-09-22 13hh 48min 41sec475ms.Jpeg",
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 47sec448ms.Jpeg",
-				"d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020-02-10\\2019-01-24 12hh 28min 39sec925ms.Jpeg.13.png",
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec118ms.Jpeg",
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 48sec784ms.Jpeg",
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 49sec447ms.Jpeg",
-				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 50sec136ms.Jpeg", }));
 		}
 		break;
 		case 4:
 		{
-			QSharedPointer<ImageLoader_Dir>pimgLoader1 = (*_imageLoaders.begin()).dynamicCast<ImageLoader_Dir>(),
-				pimgLoader2 = (*(_imageLoaders.begin() + 1)).dynamicCast<ImageLoader_Dir>();
-			_paramWidgets[ParamView::INPUT]->view->SetParam("input", pimgLoader1->Get());
-			_paramWidgets[ParamView::OUTPUT]->view->SetParam("output", pimgLoader2->Get());
+			Run();
 		}
 		break;
 		default:
@@ -281,8 +285,42 @@ void FixedUI_DEMO::Debug()
 	msgbox->setModal(false);
 	msgbox->show();
 }
-
+#include <opencv.hpp>
+#include <QtConcurrent>
 void FixedUI_DEMO::Run()
 {
+	auto inputView = _paramWidgets[ParamView::INPUT]->view,
+		outputView = _paramWidgets[ParamView::OUTPUT]->view,
+		paramView = _paramWidgets[ParamView::PARAMETER]->view;
+	
+	while (1)
+	{
+		bool isEnd = false;
+		for (auto loader : _imageLoaders)
+		{
+			if (loader->IsOpen() == false || loader->IsEnd() == true) 
+			{
+				isEnd = true;
+				break;
+			}
+		}
+		if (isEnd)break;
+		for (auto it=_imageLoaders.begin();it!=_imageLoaders.end();++it)
+		{
+			auto item = it.key();
+			auto loader = *it;
+			inputView->SetParam(inputView->GetRowName(item), loader->Get(nullptr));
+		}
+
+		cv::Mat img = inputView->GetParam("input").value<cv::Mat>();
+		cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+		int threshold = paramView->GetParam("threshold").value<int>();
+		int th = cv::threshold(img, img, threshold, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+		
+		outputView->SetParam("output", QVariant::fromValue(img));
+		outputView->SetParam("threshold", th);
+		QApplication::processEvents();
+	}
+
 
 }

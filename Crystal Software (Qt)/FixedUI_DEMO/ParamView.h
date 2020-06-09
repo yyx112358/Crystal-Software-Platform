@@ -34,8 +34,16 @@ public:
 
 	void AddParam(QString name, QVariant::Type type, QString explaination = "", QVariant defaultValue = QVariant());
 	void RemoveParam(QString name);
+
 	void SetParam(QString name, QVariant value);
 	QVariant GetParam(QString name)const;
+
+	QString GetRowName(QStandardItem*item)const;
+	int GetRow(QString name)const;
+	int GetStatus(QString name);
+	QVariant::Type GetType(QString name)const;
+	QString GetExplaination(QString name)const;
+	QStandardItem*GetValueItem(QString name);
 
 	const ROLE _role;//角色。理论上最好写成函数，但为方便这个地方会在ParamWidget()构造函数中被强行赋值
 

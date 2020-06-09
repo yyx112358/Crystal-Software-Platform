@@ -6,7 +6,6 @@
 #include "Interface_ImageLoader.h"
 
 
-enum ROLE;
 class ParamWidget;
 class ParamView;
 
@@ -27,8 +26,12 @@ public:
 
 	void ParseParamAction(QString actionName, QModelIndex index, QVariantList param, bool checked);
 private:
+	QStandardItemModel*_GetModel(int role);
+
 	Ui::FixedUI_DEMOClass ui;
 	QList<ParamWidget*>_paramWidgets;//参数调整窗口
 	QHash<QStandardItem*, QSharedPointer<Interface_ImageLoader>>_imageLoaders;//图像载入窗口	
 	QHash<QStandardItem*, QSharedPointer<QDockWidget>>_watchers;//监视窗口，TODO:后期改成一个Interface_Watcher
+
+
 };
