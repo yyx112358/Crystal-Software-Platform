@@ -7,6 +7,7 @@
 
 #include "ImageLoader_Dir.h"
 #include "ParamWidget.h"
+#include "MatGraphicsview.h"
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;
 
@@ -15,24 +16,25 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 {
 	ui.setupUi(this);
 
-	auto pimageLoader_Dir = QSharedPointer<ImageLoader_Dir>::create(this);
-	_imageLoaders.append(pimageLoader_Dir);
-	this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get());
+// 	auto pimageLoader_Dir = QSharedPointer<ImageLoader_Dir>::create(this);
+// 	_imageLoaders.append(pimageLoader_Dir);
+// 	this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get());
+// 	setCentralWidget(nullptr);
 
 	_paramWidgets.append(new ParamWidget(ParamView::INPUT,this));
-	_paramWidgets[ParamView::INPUT]->setWindowTitle(QStringLiteral("输入"));
+	_paramWidgets[ParamView::INPUT]->SetName(QStringLiteral("输入"));
 	_paramWidgets.append(new ParamWidget(ParamView::OUTPUT, this));
-	_paramWidgets[ParamView::OUTPUT]->setWindowTitle(QStringLiteral("输出"));
+	_paramWidgets[ParamView::OUTPUT]->SetName(QStringLiteral("输出"));
 	_paramWidgets.append(new ParamWidget(ParamView::PARAMETER, this));
-	_paramWidgets[ParamView::PARAMETER]->setWindowTitle(QStringLiteral("运行参数"));
+	_paramWidgets[ParamView::PARAMETER]->SetName(QStringLiteral("运行参数"));
 	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::INPUT]);
 	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::OUTPUT]);
 	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::PARAMETER]);
 // 	this->tabifyDockWidget(_paramWidgets[ParamView::INPUT], _paramWidgets[ParamView::OUTPUT]);
 // 	this->tabifyDockWidget(_paramWidgets[ParamView::OUTPUT], _paramWidgets[ParamView::PARAMETER]);
-	connect(_paramWidgets[ParamView::INPUT], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
-	connect(_paramWidgets[ParamView::OUTPUT], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
-	connect(_paramWidgets[ParamView::PARAMETER], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
+	connect(_paramWidgets[ParamView::INPUT]->view, &ParamView::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
+	connect(_paramWidgets[ParamView::OUTPUT]->view, &ParamView::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
+	connect(_paramWidgets[ParamView::PARAMETER]->view, &ParamView::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
 
 	connect(ui.actionDebug, &QAction::triggered, this, &FixedUI_DEMO::Debug);
 	connect(ui.action_SelectAlgorithm, &QAction::triggered, [this](bool b)
@@ -55,6 +57,7 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 FixedUI_DEMO::~FixedUI_DEMO()
 {
 	_imageLoaders.clear();
+	_watchers.clear();
 }
 
 
@@ -62,26 +65,86 @@ void FixedUI_DEMO::SelectAlgorithm(QString name)
 {
 	if(name == QStringLiteral("阈值化分割"))
 	{		
-		_paramWidgets[ParamView::INPUT]->AddParam("input", MatTypeId(), QStringLiteral("输入图像"));
+		_paramWidgets[ParamView::INPUT]->view->AddParam("input", MatTypeId(), QStringLiteral("输入图像"));
 
-		_paramWidgets[ParamView::OUTPUT]->AddParam("output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
-		_paramWidgets[ParamView::OUTPUT]->AddParam("threshold", QVariant::Int, QStringLiteral("阈值"));
+		_paramWidgets[ParamView::OUTPUT]->view->AddParam("output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
+		_paramWidgets[ParamView::OUTPUT]->view->AddParam("threshold", QVariant::Int, QStringLiteral("阈值"));
 		
-		_paramWidgets[ParamView::PARAMETER]->AddParam("threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
-		_paramWidgets[ParamView::PARAMETER]->AddParam("isDisplay", QVariant::Bool, QStringLiteral("阈值"), false);
-		_paramWidgets[ParamView::PARAMETER]->AddParam("offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3, 3));
+		_paramWidgets[ParamView::PARAMETER]->view->AddParam("threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
+		_paramWidgets[ParamView::PARAMETER]->view->AddParam("isDisplay", QVariant::Bool, QStringLiteral("阈值"), false);
+		_paramWidgets[ParamView::PARAMETER]->view->AddParam("offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3, 3));
 	}
 }
 
 
+void FixedUI_DEMO::AddParamWatcher(ParamView&view, QString name, QStandardItem*paramValue)
+{
+	QSharedPointer<QDockWidget>container = QSharedPointer<QDockWidget>::create(this);
+	container->setObjectName(name);
+	container->setWindowTitle(name);
+	container->resize(400, 300);
+	QWidget*widget = new QWidget(container.data());
+	auto containerLayout = new QVBoxLayout(widget);
+	containerLayout->setSpacing(0);
+	containerLayout->setObjectName(QString::fromUtf8("containerLayout"));
+	containerLayout->setContentsMargins(0, 0, 0, 0);
+	widget->setLayout(containerLayout);
+
+	//TODO:改为Interface_Watcher实现多类型监视
+	auto matView = new MatGraphicsview(widget);
+	matView->setObjectName("matView");
+	if (paramValue->data().canConvert<cv::Mat>())
+		matView->SetImg(paramValue->data().value<cv::Mat>());
+	containerLayout->addWidget(matView);
+	container->setWidget(widget);
+	
+	connect(&view, &ParamView::sig_ParamChanged, this, [this](QStandardItem*paramValue)
+	{
+		if (paramValue == nullptr)return;
+		if (paramValue->column() == ParamView::VALUE
+			&& _watchers.count(paramValue) > 0
+			&& _watchers[paramValue].isNull() == false)
+		{
+			auto container = _watchers[paramValue];
+			if (paramValue->data(Qt::ItemDataRole::EditRole).canConvert<cv::Mat>())
+			{
+				auto matView = container->findChild<MatGraphicsview*>("matView");
+				matView->SetImg(paramValue->data(Qt::ItemDataRole::EditRole).value<cv::Mat>());
+			}
+		}
+	}, Qt::UniqueConnection);
+	connect(&view, &ParamView::sig_ParamRemoved, this, [this](QStandardItem*paramValue)
+	{
+		if (paramValue == nullptr)return;
+		if (paramValue->column() == ParamView::VALUE)
+		{
+			_watchers.remove(paramValue);
+		}
+	}, Qt::UniqueConnection);
+	connect(container.data(), &QDockWidget::destroyed, [this](QObject*obj)
+	{
+		for (auto &c : _watchers)
+			if(c==obj)
+				c.clear();
+	});
+// 	if(_watchers.size()==0)
+// 		addDockWidget(Qt::BottomDockWidgetArea, container.data(), Qt::Horizontal);
+// 	else 
+	{
+		addDockWidget(Qt::DockWidgetArea::BottomDockWidgetArea, container.data(), Qt::Horizontal);
+		//splitDockWidget(container.data(),_paramWidgets[ParamView::PARAMETER],  Qt::Horizontal);
+	}
+	_watchers.insert(paramValue, container);
+}
+
 void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVariantList param, bool checked)
 {
 	ParamView::ROLE role = ParamView::INPUT;
-	if (sender() == _paramWidgets[ParamView::INPUT])
+	if (sender() == _paramWidgets[ParamView::INPUT]->view)
 		role = ParamView::INPUT;
-	else if (sender() == _paramWidgets[ParamView::OUTPUT])
+	else if (sender() == _paramWidgets[ParamView::OUTPUT]->view)
 		role = ParamView::OUTPUT;
-	else if (sender() == _paramWidgets[ParamView::PARAMETER])
+	else if (sender() == _paramWidgets[ParamView::PARAMETER]->view)
 		role = ParamView::PARAMETER;
 	else
 		return;
@@ -96,6 +159,9 @@ void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVari
 	}
 	else if (actionName == QStringLiteral("监视"))
 	{
+		AddParamWatcher(*_paramWidgets[role]->view,
+			sender()->objectName() + ":" + param[ParamView::NAME].toString(),
+			qobject_cast<QStandardItemModel*>(_paramWidgets[role]->view->model())->itemFromIndex(index));
 
 	}
 }
@@ -112,9 +178,15 @@ void FixedUI_DEMO::Debug()
 		case 0:
 		{
 			SelectAlgorithm(QStringLiteral("阈值化分割"));
-			}
+		}
 		break;
 		case 1:
+		{
+			_paramWidgets[ParamView::INPUT]->view->SetParam("input", QVariant::fromValue(cv::imread("d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO02_2019-09-22 13hh 48min 41sec475ms.Jpeg")));
+			_paramWidgets[ParamView::OUTPUT]->view->SetParam("output", QVariant::fromValue(cv::imread("d:\\Users\\yyx11\\Desktop\\Saved Pictures\\BRISQUE_2020-02-10\\2019-01-24 12hh 28min 39sec925ms.Jpeg.13.png")));
+		}
+		break;
+		case 999:
 		{
 			QSharedPointer<ImageLoader_Dir>pimgLoader = _imageLoaders.back().dynamicCast<ImageLoader_Dir>();
 			GRAPH_ASSERT(pimgLoader->Load({
@@ -145,6 +217,9 @@ void FixedUI_DEMO::Debug()
 		qDebug() << e.msg;
 		GRAPH_INFORM(e.msg);
 		QMessageBox::warning(this, __FUNCTION__, e.msg);
+#ifdef _DEBUG
+		e.raise();
+#endif // _DEBUG
 	}
 	cnt++;
 

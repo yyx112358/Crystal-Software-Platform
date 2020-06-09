@@ -20,7 +20,7 @@ void ParamDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
 	QStyleOptionViewItem myoption = option;
 	if (index.data().canConvert<cv::Mat>() == true)
 	{
-		qDebug() << index << index.data();
+		//qDebug() << index << index.data();
 		cv::Mat m = index.data(Qt::EditRole).value<cv::Mat>();
 
 		if (myoption.state & QStyle::State_Selected)
@@ -39,8 +39,6 @@ void ParamDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
 	}
 	else if (index.column() == ParamView::TYPE)
 	{
-		auto d = index.data();
-		auto n = index.data().typeName();
 		painter->drawText(myoption.rect, QVariant::typeToName(index.data().toInt()));
 	}
 	else

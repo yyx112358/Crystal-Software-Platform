@@ -2,6 +2,7 @@
 
 #include <QTableView>
 class QStandardItemModel;
+class QStandardItem;
 
 class ParamView : public QTableView
 {
@@ -28,7 +29,7 @@ public:
 		MONITOR,//监视
 	};
 
-	ParamView(QWidget *parent, ROLE role);
+	ParamView(QWidget *parent);
 	~ParamView();
 
 	void AddParam(QString name, QVariant::Type type, QString explaination = "", QVariant defaultValue = QVariant());
@@ -36,10 +37,13 @@ public:
 	void SetParam(QString name, QVariant value);
 	QVariant GetParam(QString name)const;
 
-	const ROLE _role;
+	const ROLE _role;//角色。理论上最好写成函数，但为方便这个地方会在ParamWidget()构造函数中被强行赋值
 
 signals:
 	void sig_ActionTriggered(QString actionName, QModelIndex index, QVariantList param, bool checked);
+	void sig_ParamAdded(QStandardItem*paramValue);
+	void sig_ParamChanged(QStandardItem*paramValue);
+	void sig_ParamRemoved(QStandardItem*paramValue);
 private:
 	QStandardItemModel _model;//模型，存储数据用的。如果需要一套模型多个视图则需要将其抽出
 

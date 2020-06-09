@@ -6,8 +6,8 @@
 #include "GraphError.h"
 #include "CustomTypes.h"
 
-ParamView::ParamView(QWidget *parent, ROLE role)
-	: QTableView(parent),_role(role),_model(this)
+ParamView::ParamView(QWidget *parent)
+	: QTableView(parent),_role(PARAMETER),_model(this)
 {
 	_model.setColumnCount(5);
 	_model.setHeaderData(COLUMN::STATUS, Qt::Orientation::Horizontal, "", Qt::ItemDataRole::DisplayRole);
@@ -29,10 +29,11 @@ ParamView::ParamView(QWidget *parent, ROLE role)
 	setColumnWidth(COLUMN::TYPE, 40);
 	setColumnWidth(COLUMN::EXPLAINATION, 200);
 
-	connect(&_model, &QStandardItemModel::itemChanged, [this](QStandardItem*item)
-	{
-		qDebug() << item->row() << item->column() << item->data();
-	});
+	connect(&_model, &QStandardItemModel::itemChanged, this, &ParamView::sig_ParamChanged);
+// 	connect(&_model, &QStandardItemModel::itemChanged, [this](QStandardItem*item)
+// 	{
+// 		qDebug() << item->row() << item->column() << item->data();
+// 	});
 }
 
 ParamView::~ParamView()
@@ -86,9 +87,11 @@ void ParamView::SetParam(QString name, QVariant value)
 	GRAPH_ASSERT(items.size() <= 1);//原则上名称唯一
 	for (auto &item : items)
 	{
+		auto t = _model.data(_model.index(item->row(), COLUMN::TYPE)).toInt();
 		GRAPH_ASSERT(value.isValid() == false
-			|| value.canConvert(_model.item(item->row(), COLUMN::TYPE)->data().toInt()));//类型检查
-		_model.item(item->row(), COLUMN::VALUE)->setData(value);
+			|| value.canConvert(t) == true);//类型检查
+		_model.item(item->row(), COLUMN::VALUE)->setData(value,Qt::ItemDataRole::EditRole);
+		resizeRowsToContents();
 	}
 }
 
@@ -126,7 +129,6 @@ void ParamView::contextMenuEvent(QContextMenuEvent *event)
 			else
 				menu.addAction(QStringLiteral("断开输入源"));
 		}
-		action = menu.addAction(QString("Show"));
 		action = menu.addAction(QStringLiteral("监视"));
 		action->setCheckable(true);
 		

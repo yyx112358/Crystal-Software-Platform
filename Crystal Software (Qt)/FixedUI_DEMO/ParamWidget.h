@@ -4,6 +4,7 @@
 #include "ui_ParamWidget.h"
 #include "ParamView.h"
 
+//ParamView包装类，唯一作用是把ParamView放进一个DockWidget
 class ParamWidget : public QDockWidget
 {
 	Q_OBJECT
@@ -12,16 +13,8 @@ public:
 	ParamWidget(ParamView::ROLE role, QWidget *parent = Q_NULLPTR);
 	~ParamWidget();
 
-	void AddParam(QString name, QVariant::Type type, QString explaination = "", QVariant defaultValue = QVariant());
-	void RemoveParam(QString name);
-	void SetParam(QString name, QVariant value);
-	QVariant GetParam(QString name)const;
-
-	const ParamView::ROLE role;
-
-signals:
-	void sig_ActionTriggered(QString actionName, QModelIndex index, QVariantList param, bool checked);
-
+	void SetName(QString name);
+	ParamView*const view = nullptr;//直接暴露指针，图个省事
 private:
 
 	Ui::ParamWidget ui;
