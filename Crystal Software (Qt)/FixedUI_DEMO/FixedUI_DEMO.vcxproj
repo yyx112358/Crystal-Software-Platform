@@ -103,7 +103,7 @@
     <ClCompile Include="MatGraphicsView.cpp" />
     <ClCompile Include="ParamDelegate.cpp" />
     <ClCompile Include="ParamView.cpp" />
-    <ClCompile Include="ParamViewer.cpp" />
+    <ClCompile Include="ParamWidget.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -118,7 +118,7 @@
     <ClInclude Include="Interface_ImageLoader.h" />
     <QtMoc Include="FixedUI_DEMO.h" />
     <QtMoc Include="MatGraphicsView.h" />
-    <QtMoc Include="ParamViewer.h" />
+    <QtMoc Include="ParamWidget.h" />
     <QtMoc Include="ParamView.h" />
     <QtMoc Include="ParamDelegate.h" />
     <ClInclude Include="stdafx.h" />
@@ -128,7 +128,7 @@
     <QtUic Include="GuiStatusview.ui" />
     <QtUic Include="ImageLoader_Camera.ui" />
     <QtUic Include="ImageLoader_Dir.ui" />
-    <QtUic Include="ParamViewer.ui" />
+    <QtUic Include="ParamWidget.ui" />
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="FixedUI_DEMO.qrc" />

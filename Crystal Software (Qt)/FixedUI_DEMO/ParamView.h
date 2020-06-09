@@ -22,6 +22,11 @@ public:
 		TYPE=3,
 		EXPLAINATION=4,
 	};//各个列及编号
+	enum ACTION
+	{
+		CONNECT_SOURCE,//连接输入输出源
+		MONITOR,//监视
+	};
 
 	ParamView(QWidget *parent, ROLE role);
 	~ParamView();
@@ -34,7 +39,7 @@ public:
 	const ROLE _role;
 
 signals:
-	void sig_ActionTriggered(QString actionName, ROLE role, QVariantList param, bool checked);
+	void sig_ActionTriggered(QString actionName, QModelIndex index, QVariantList param, bool checked);
 private:
 	QStandardItemModel _model;//模型，存储数据用的。如果需要一套模型多个视图则需要将其抽出
 

@@ -3,6 +3,8 @@
 #include "CustomTypes.h"
 #include <opencv2/imgproc.hpp>
 #include "MatGraphicsView.h"
+#include "ParamView.h"
+#include <QDebug>
 
 ParamDelegate::ParamDelegate(QObject *parent)
 	: QStyledItemDelegate(parent)
@@ -18,18 +20,28 @@ void ParamDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
 	QStyleOptionViewItem myoption = option;
 	if (index.data().canConvert<cv::Mat>() == true)
 	{
+		qDebug() << index << index.data();
 		cv::Mat m = index.data(Qt::EditRole).value<cv::Mat>();
 
 		if (myoption.state & QStyle::State_Selected)
 			painter->fillRect(myoption.rect, myoption.palette.highlight());		
 		
-		cv::resize(m, m, cv::Size(50, 50));//TODO:等比例缩放至最大50*50
-		QPixmap pix = Mat2QPixmap(m);
-		painter->drawPixmap(myoption.rect.x(), myoption.rect.y(), pix);
-		myoption.rect.setX(myoption.rect.x() + pix.width());
+		if (m.empty() == false)
+		{
+			cv::resize(m, m, cv::Size(50, 50));//TODO:等比例缩放至最大50*50
+			QPixmap pix = Mat2QPixmap(m);
+			painter->drawPixmap(myoption.rect.x(), myoption.rect.y(), pix);
+			myoption.rect.setX(myoption.rect.x() + pix.width());
+		}
 
 		QString str = displayText(index.data(), QLocale::system());
 		painter->drawText(myoption.rect, str);
+	}
+	else if (index.column() == ParamView::TYPE)
+	{
+		auto d = index.data();
+		auto n = index.data().typeName();
+		painter->drawText(myoption.rect, QVariant::typeToName(index.data().toInt()));
 	}
 	else
 		QStyledItemDelegate::paint(painter, option, index);

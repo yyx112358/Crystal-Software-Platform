@@ -6,7 +6,7 @@
 #include "CustomTypes.h"
 
 #include "ImageLoader_Dir.h"
-#include "ParamViewer.h"
+#include "ParamWidget.h"
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;
 
@@ -19,8 +19,20 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 	_imageLoaders.append(pimageLoader_Dir);
 	this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get());
 
-	_paramViewer=new ParamViewer(this);
-	this->addDockWidget(Qt::RightDockWidgetArea, _paramViewer);
+	_paramWidgets.append(new ParamWidget(ParamView::INPUT,this));
+	_paramWidgets[ParamView::INPUT]->setWindowTitle(QStringLiteral("输入"));
+	_paramWidgets.append(new ParamWidget(ParamView::OUTPUT, this));
+	_paramWidgets[ParamView::OUTPUT]->setWindowTitle(QStringLiteral("输出"));
+	_paramWidgets.append(new ParamWidget(ParamView::PARAMETER, this));
+	_paramWidgets[ParamView::PARAMETER]->setWindowTitle(QStringLiteral("运行参数"));
+	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::INPUT]);
+	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::OUTPUT]);
+	this->addDockWidget(Qt::RightDockWidgetArea, _paramWidgets[ParamView::PARAMETER]);
+// 	this->tabifyDockWidget(_paramWidgets[ParamView::INPUT], _paramWidgets[ParamView::OUTPUT]);
+// 	this->tabifyDockWidget(_paramWidgets[ParamView::OUTPUT], _paramWidgets[ParamView::PARAMETER]);
+	connect(_paramWidgets[ParamView::INPUT], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
+	connect(_paramWidgets[ParamView::OUTPUT], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
+	connect(_paramWidgets[ParamView::PARAMETER], &ParamWidget::sig_ActionTriggered, this, &FixedUI_DEMO::ParseParamAction);
 
 	connect(ui.actionDebug, &QAction::triggered, this, &FixedUI_DEMO::Debug);
 	connect(ui.action_SelectAlgorithm, &QAction::triggered, [this](bool b)
@@ -50,21 +62,42 @@ void FixedUI_DEMO::SelectAlgorithm(QString name)
 {
 	if(name == QStringLiteral("阈值化分割"))
 	{		
-		_paramViewer->AddParam(ParamView::PARAMETER, "threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
-		_paramViewer->AddParam(ParamView::PARAMETER, "isDisplay", QVariant::Bool, QStringLiteral("阈值"), false);
-		_paramViewer->AddParam(ParamView::PARAMETER, "offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3, 3));
-		
-		_paramViewer->AddParam(ParamView::INPUT, "input", MatTypeId(), QStringLiteral("输入图像"));
+		_paramWidgets[ParamView::INPUT]->AddParam("input", MatTypeId(), QStringLiteral("输入图像"));
 
-		_paramViewer->AddParam(ParamView::OUTPUT, "output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
-		_paramViewer->AddParam(ParamView::OUTPUT, "threshold", QVariant::Int, QStringLiteral("阈值"));
+		_paramWidgets[ParamView::OUTPUT]->AddParam("output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
+		_paramWidgets[ParamView::OUTPUT]->AddParam("threshold", QVariant::Int, QStringLiteral("阈值"));
+		
+		_paramWidgets[ParamView::PARAMETER]->AddParam("threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
+		_paramWidgets[ParamView::PARAMETER]->AddParam("isDisplay", QVariant::Bool, QStringLiteral("阈值"), false);
+		_paramWidgets[ParamView::PARAMETER]->AddParam("offset", QVariant::Point, QStringLiteral("阈值"), QPoint(3, 3));
 	}
 }
 
 
-void FixedUI_DEMO::ParseParamAction(QString actionName, ROLE role, QVariantList param, bool checked)
+void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVariantList param, bool checked)
 {
-	if(param[ParamView::TYPE].toInt()==MatTypeId())
+	ParamView::ROLE role = ParamView::INPUT;
+	if (sender() == _paramWidgets[ParamView::INPUT])
+		role = ParamView::INPUT;
+	else if (sender() == _paramWidgets[ParamView::OUTPUT])
+		role = ParamView::OUTPUT;
+	else if (sender() == _paramWidgets[ParamView::PARAMETER])
+		role = ParamView::PARAMETER;
+	else
+		return;
+
+	if (actionName== QStringLiteral("连接输入源"))
+	{
+		
+	}
+	else if (actionName == QStringLiteral("断开输入源"))
+	{
+
+	}
+	else if (actionName == QStringLiteral("监视"))
+	{
+
+	}
 }
 
 #include <opencv2/highgui.hpp>

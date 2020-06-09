@@ -67,13 +67,13 @@
     <ClCompile Include="MatGraphicsView.cpp">
       <Filter>Sub Viewers\ImageViewer</Filter>
     </ClCompile>
-    <ClCompile Include="ParamViewer.cpp">
-      <Filter>Sub Viewers\ParamViewer</Filter>
-    </ClCompile>
     <ClCompile Include="ParamDelegate.cpp">
       <Filter>Sub Viewers\ParamViewer</Filter>
     </ClCompile>
     <ClCompile Include="ParamView.cpp">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </ClCompile>
+    <ClCompile Include="ParamWidget.cpp">
       <Filter>Sub Viewers\ParamViewer</Filter>
     </ClCompile>
   </ItemGroup>
@@ -107,13 +107,13 @@
     <QtMoc Include="MatGraphicsView.h">
       <Filter>Sub Viewers\ImageViewer</Filter>
     </QtMoc>
-    <QtMoc Include="ParamViewer.h">
-      <Filter>Sub Viewers\ParamViewer</Filter>
-    </QtMoc>
     <QtMoc Include="ParamDelegate.h">
       <Filter>Sub Viewers\ParamViewer</Filter>
     </QtMoc>
     <QtMoc Include="ParamView.h">
+      <Filter>Sub Viewers\ParamViewer</Filter>
+    </QtMoc>
+    <QtMoc Include="ParamWidget.h">
       <Filter>Sub Viewers\ParamViewer</Filter>
     </QtMoc>
   </ItemGroup>
@@ -130,7 +130,7 @@
     <QtUic Include="GuiStatusview.ui">
       <Filter>Sub Viewers\StatusViewer</Filter>
     </QtUic>
-    <QtUic Include="ParamViewer.ui">
+    <QtUic Include="ParamWidget.ui">
       <Filter>Sub Viewers\ParamViewer</Filter>
     </QtUic>
   </ItemGroup>

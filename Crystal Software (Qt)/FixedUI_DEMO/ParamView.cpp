@@ -28,6 +28,11 @@ ParamView::ParamView(QWidget *parent, ROLE role)
 	setColumnWidth(COLUMN::VALUE, 80);
 	setColumnWidth(COLUMN::TYPE, 40);
 	setColumnWidth(COLUMN::EXPLAINATION, 200);
+
+	connect(&_model, &QStandardItemModel::itemChanged, [this](QStandardItem*item)
+	{
+		qDebug() << item->row() << item->column() << item->data();
+	});
 }
 
 ParamView::~ParamView()
@@ -46,10 +51,10 @@ void ParamView::AddParam(QString name, QVariant::Type type, QString explaination
 		list[COLUMN::STATUS]->setData("", Qt::ItemDataRole::DisplayRole);
 		list[COLUMN::NAME]->setData(name, Qt::ItemDataRole::DisplayRole);
 		list[COLUMN::VALUE]->setData(defaultValue, Qt::ItemDataRole::EditRole);
-		list[COLUMN::TYPE]->setData(QVariant::typeToName(type), Qt::ItemDataRole::DisplayRole);
+		list[COLUMN::TYPE]->setData((int)type, Qt::ItemDataRole::DisplayRole);
 		list[COLUMN::EXPLAINATION]->setData(explaination, Qt::ItemDataRole::DisplayRole);
 		_model.appendRow(list);
-
+		
 		resizeRowsToContents();
 		//_slot_ItemChanged(list[E_ColumnHeader::VALUE]);
 	}
@@ -61,7 +66,7 @@ void ParamView::AddParam(QString name, QVariant::Type type, QString explaination
 			_model.setData(_model.index(row, COLUMN::STATUS), "", Qt::ItemDataRole::DisplayRole);
 			//_model.setData(_model.index(row, COLUMN::VALUE), name, Qt::ItemDataRole::DisplayRole);
 			_model.setData(_model.index(row, COLUMN::VALUE), defaultValue, Qt::ItemDataRole::EditRole);
-			_model.setData(_model.index(row, COLUMN::TYPE), QVariant::typeToName(type), Qt::ItemDataRole::DisplayRole);
+			_model.setData(_model.index(row, COLUMN::TYPE), (int)type, Qt::ItemDataRole::DisplayRole);
 			_model.setData(_model.index(row, COLUMN::EXPLAINATION), explaination, Qt::ItemDataRole::DisplayRole);
 		}
 	}
@@ -82,7 +87,7 @@ void ParamView::SetParam(QString name, QVariant value)
 	for (auto &item : items)
 	{
 		GRAPH_ASSERT(value.isValid() == false
-			|| value.canConvert(_model.item(item->row(), COLUMN::TYPE)->data().userType()));//类型检查
+			|| value.canConvert(_model.item(item->row(), COLUMN::TYPE)->data().toInt()));//类型检查
 		_model.item(item->row(), COLUMN::VALUE)->setData(value);
 	}
 }
@@ -102,23 +107,33 @@ void ParamView::contextMenuEvent(QContextMenuEvent *event)
 	QModelIndex modelIndex = currentIndex();
 	if (modelIndex.isValid() == true)
 	{
-		int row = modelIndex.row(),col=modelIndex.column();
-		int type = _model.item(row, TYPE)->data().toInt();
+		int row = modelIndex.row(), col = modelIndex.column();
+		int type = _model.data(_model.index(row, COLUMN::TYPE)).toInt() ;
 		QVariantList paramInfo({ QVariant(),QVariant() ,QVariant() ,QVariant() ,QVariant() });
-		paramInfo[STATUS] = _model.item(row, STATUS)->data();
-		paramInfo[NAME] = _model.item(row, NAME)->data();
-		paramInfo[VALUE] = _model.item(row, VALUE)->data();
-		paramInfo[TYPE] = _model.item(row, TYPE)->data();
-		paramInfo[EXPLAINATION] = _model.item(row, EXPLAINATION)->data();
+		
+		paramInfo[STATUS] = _model.data(_model.index(row, COLUMN::STATUS));
+		paramInfo[NAME] = _model.data(_model.index(row, COLUMN::NAME));
+		paramInfo[VALUE] = _model.data(_model.index(row, COLUMN::VALUE));
+		paramInfo[TYPE] = _model.data(_model.index(row, COLUMN::TYPE));
+		paramInfo[EXPLAINATION] = _model.data(_model.index(row, COLUMN::EXPLAINATION));
 
 		QMenu menu(this);
-		QAction*actionShow = menu.addAction(QString("Show"));
-		QAction*actionMonitor = menu.addAction(QStringLiteral("监视"));
+		QAction*action = nullptr;
+		if (type == MatTypeId()&&_role==INPUT)
+		{
+			if(paramInfo[VALUE].isValid() == false)
+				menu.addAction(QStringLiteral("连接输入源"));
+			else
+				menu.addAction(QStringLiteral("断开输入源"));
+		}
+		action = menu.addAction(QString("Show"));
+		action = menu.addAction(QStringLiteral("监视"));
+		action->setCheckable(true);
 		
 		
 		QAction*result = menu.exec(cursor().pos());
 		if (result != nullptr)
-			emit sig_ActionTriggered(result->text(), _role, paramInfo, result->isChecked());
+			emit sig_ActionTriggered(result->text(), modelIndex, paramInfo, result->isChecked());
 	}
 	return QTableView::contextMenuEvent(event);
 }
