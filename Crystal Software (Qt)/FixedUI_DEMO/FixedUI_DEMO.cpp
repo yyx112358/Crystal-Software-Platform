@@ -16,11 +16,6 @@ FixedUI_DEMO::FixedUI_DEMO(QWidget *parent)
 {
 	ui.setupUi(this);
 
-// 	auto pimageLoader_Dir = QSharedPointer<ImageLoader_Dir>::create(this);
-// 	_imageLoaders.append(pimageLoader_Dir);
-// 	this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get());
-// 	setCentralWidget(nullptr);
-
 	_paramWidgets.append(new ParamWidget(ParamView::INPUT,this));
 	_paramWidgets[ParamView::INPUT]->SetName(QStringLiteral(" ‰»Î"));
 	_paramWidgets.append(new ParamWidget(ParamView::OUTPUT, this));
@@ -252,7 +247,12 @@ void FixedUI_DEMO::Debug()
 				"d:/Users/yyx11/Desktop/Saved Pictures/crystal_dataset/crystal_20190905/NO06_2019-09-05 09hh 19min 55sec622ms.Jpeg", }));
 		}
 		break;
-		case 4:
+		case 5:
+		{
+			Run();
+		}
+		break;
+		case 6:
 		{
 			Run();
 		}
