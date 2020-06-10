@@ -35,7 +35,7 @@ public:
 	virtual void SetIsSave(bool isSave, int maximum = 2147483647) override;
 
 private:
-	bool AssertInput(QVariant&var);
+	bool AssertInput(QVariant var)const;
 
 	QWidget*_widget = nullptr;
 	QVBoxLayout*_layout = nullptr;

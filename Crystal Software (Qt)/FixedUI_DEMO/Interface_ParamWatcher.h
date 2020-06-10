@@ -1,9 +1,6 @@
 #pragma once
 
-class QVariant;
-template<typename T> 
-class QList;
-template QList<QVariant>;
+#include <QVariant>
 
 class Interface_ParamWatcher
 {

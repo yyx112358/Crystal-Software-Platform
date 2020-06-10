@@ -21,8 +21,8 @@ public:
 	void Run();
 	void SelectAlgorithm(QString name);
 
-	void AddParamLoader(ParamView&view, QString name, QStandardItem*paramValue);
-	void AddParamWatcher(ParamView&view, QString name, QStandardItem*paramValue);
+	void AddParamLoader(ParamView&view, QString name);
+	void AddParamWatcher(ParamView&view, QString name);
 
 	void ParseParamAction(QString actionName, QModelIndex index, QVariantList param, bool checked);
 private:

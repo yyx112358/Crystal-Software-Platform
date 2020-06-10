@@ -12,7 +12,6 @@ NumberWatcher::NumberWatcher(QWidget *parent)
 	setObjectName(QString::fromUtf8("NumberWatcher"));
 	resize(400, 300);
 
-	_widget = new QWidget();
 	_widget->setObjectName(QString::fromUtf8("_widget"));
 	_layout = new QVBoxLayout(_widget);
 	_layout->setSpacing(0);
@@ -34,6 +33,10 @@ NumberWatcher::NumberWatcher(QWidget *parent)
 	_chartView->setRenderHint(QPainter::RenderHint::Antialiasing);//抗锯齿
 	_chart->setAnimationOptions(QChart::AnimationOption::SeriesAnimations);//动画选项
 	_chart->legend()->hide();//图例
+	_chart->setTheme(QChart::ChartTheme::ChartThemeBlueCerulean);//主题
+	auto pal = window()->palette();
+	pal.setColor(QPalette::Window, QRgb(0x40434a));
+	pal.setColor(QPalette::WindowText, QRgb(0xd6d6d6));
 
 	_chart->addSeries(_line);
 	_line->pen().setColor(Qt::GlobalColor::blue);
@@ -44,7 +47,7 @@ NumberWatcher::NumberWatcher(QWidget *parent)
 	_chart->setAxisX(_axisX, _line);
 	_axisX->setRange(0, 60);
 	_chart->setAxisY(_axisY, _line);
-	_axisY->setRange(0, 5);
+	_axisY->setRange(0, 256);
 }
 
 NumberWatcher::~NumberWatcher()
@@ -54,6 +57,7 @@ NumberWatcher::~NumberWatcher()
 bool NumberWatcher::Reset()
 {
 	_line->clear();
+	return true;
 }
 
 bool NumberWatcher::AppendParam(QVariant param)
@@ -71,6 +75,7 @@ bool NumberWatcher::AppendParam(QVariant param)
 	float dx = _chart->plotArea().width() / (_axisX->max() - _axisX->min());
 	if (valueX > _axisX->max()*0.8)
 		_chart->scroll(dx, 0);
+	return true;
 }
 
 bool NumberWatcher::AppendParam(QList<QVariant>params)
@@ -103,7 +108,7 @@ void NumberWatcher::SetIsSave(bool isSave, int maximum /*= 2147483647*/)
 	throw std::logic_error("The method or operation is not implemented.");
 }
 
-bool NumberWatcher::AssertInput(QVariant&var)
+bool NumberWatcher::AssertInput(QVariant var)const
 {
 	if (var.isValid() == true && var.canConvert(type()) == true)
 		return true;

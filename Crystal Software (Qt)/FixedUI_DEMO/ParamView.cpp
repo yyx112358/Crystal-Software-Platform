@@ -141,7 +141,7 @@ QStandardItem* ParamView::GetValueItem(QString name)
 {
 	int row = GetRow(name);
 	if (row < 0)return nullptr;
-	return _model.item(row, EXPLAINATION);
+	return _model.item(row, VALUE);
 }
 
 void ParamView::contextMenuEvent(QContextMenuEvent *event)

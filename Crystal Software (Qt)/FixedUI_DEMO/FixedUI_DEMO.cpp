@@ -8,6 +8,7 @@
 #include "ImageLoader_Dir.h"
 #include "ParamWidget.h"
 #include "MatGraphicsview.h"
+#include "NumberWatcher.h"
 
 QtPrivate::GraphWarning_StaticHandler GraphWarning::handler;
 
@@ -63,7 +64,7 @@ void FixedUI_DEMO::SelectAlgorithm(QString name)
 	{		
 		_paramWidgets[ParamView::INPUT]->view->AddParam("input", MatTypeId(), QStringLiteral("输入图像"));
 
-		_paramWidgets[ParamView::OUTPUT]->view->AddParam("output", MatTypeId(), QStringLiteral("输出图像"), QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U)));
+		_paramWidgets[ParamView::OUTPUT]->view->AddParam("output", MatTypeId(), QStringLiteral("输出图像")/*, QVariant::fromValue<cv::Mat>(cv::Mat::zeros(3, 4, CV_8U))*/);
 		_paramWidgets[ParamView::OUTPUT]->view->AddParam("threshold", QVariant::Int, QStringLiteral("阈值"));
 		
 		_paramWidgets[ParamView::PARAMETER]->view->AddParam("threshold1", QVariant::Int, QStringLiteral("阈值"), 7);
@@ -73,72 +74,104 @@ void FixedUI_DEMO::SelectAlgorithm(QString name)
 }
 
 
-void FixedUI_DEMO::AddParamLoader(ParamView&view, QString name, QStandardItem*paramValue)
+void FixedUI_DEMO::AddParamLoader(ParamView&view, QString name)
 {
 	 auto pimageLoader_Dir = QSharedPointer<ImageLoader_Dir>::create(this);
-	 _imageLoaders[paramValue] = pimageLoader_Dir;
+	 QStandardItem*item = view.GetValueItem(name);
+	 if (item == nullptr)
+		 return; 
+	 _imageLoaders[item] = pimageLoader_Dir;
 	 this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, pimageLoader_Dir.get(), Qt::Vertical);
 	 //setCentralWidget(nullptr);
 }
 
-void FixedUI_DEMO::AddParamWatcher(ParamView&view, QString name, QStandardItem*paramValue)
+void FixedUI_DEMO::AddParamWatcher(ParamView&view, QString name)
 {
-	QSharedPointer<QDockWidget>container = QSharedPointer<QDockWidget>::create(this);
-	container->setObjectName(name);
-	container->setWindowTitle(name);
-	container->resize(400, 300);
-	QWidget*widget = new QWidget(container.data());
-	auto containerLayout = new QVBoxLayout(widget);
-	containerLayout->setSpacing(0);
-	containerLayout->setObjectName(QString::fromUtf8("containerLayout"));
-	containerLayout->setContentsMargins(0, 0, 0, 0);
-	widget->setLayout(containerLayout);
+	QVariant::Type type = view.GetType(name);
+	QStandardItem*item = view.GetValueItem(name);
+	if (item == nullptr)
+		return;
+	name = view.objectName() + ":" + name;
+	if(type==MatTypeId())
+	{
+		QSharedPointer<QDockWidget>container = QSharedPointer<QDockWidget>::create(this);
+		container->setObjectName(name);
+		container->setWindowTitle(name);
+		container->resize(400, 300);
+		QWidget*widget = new QWidget(container.data());
+		auto containerLayout = new QVBoxLayout(widget);
+		containerLayout->setSpacing(0);
+		containerLayout->setObjectName(QString::fromUtf8("containerLayout"));
+		containerLayout->setContentsMargins(0, 0, 0, 0);
+		widget->setLayout(containerLayout);
 
-	//TODO:改为Interface_Watcher实现多类型监视
-	auto matView = new MatGraphicsview(widget);
-	matView->setObjectName("matView");
-	if (paramValue->data().canConvert<cv::Mat>())
-		matView->SetImg(paramValue->data().value<cv::Mat>());
-	containerLayout->addWidget(matView);
-	container->setWidget(widget);
-	
-	connect(&view, &ParamView::sig_ParamChanged, this, [this](QStandardItem*paramValue)
-	{
-		if (paramValue == nullptr)return;
-		if (paramValue->column() == ParamView::VALUE
-			&& _watchers.count(paramValue) > 0
-			&& _watchers[paramValue].isNull() == false)
+		//TODO:改为Interface_Watcher实现多类型监视
+		auto matView = new MatGraphicsview(widget);
+		matView->setObjectName("matView");
+		if (item->data().canConvert<cv::Mat>())
+			matView->SetImg(item->data().value<cv::Mat>());
+		containerLayout->addWidget(matView);
+		container->setWidget(widget);
+
+		connect(&view, &ParamView::sig_ParamChanged, this, [this](QStandardItem*paramValue)
 		{
-			auto container = _watchers[paramValue];
-			if (paramValue->data(Qt::ItemDataRole::EditRole).canConvert<cv::Mat>())
+			if (paramValue == nullptr)return;
+			if (paramValue->column() == ParamView::VALUE
+				&& _watchers.count(paramValue) > 0
+				&& _watchers[paramValue].isNull() == false)
 			{
-				auto matView = container->findChild<MatGraphicsview*>("matView");
-				matView->SetImg(paramValue->data(Qt::ItemDataRole::EditRole).value<cv::Mat>());
+				auto container = _watchers[paramValue];
+				if (paramValue->data(Qt::ItemDataRole::EditRole).canConvert<cv::Mat>())
+				{
+					auto matView = container->findChild<MatGraphicsview*>("matView");
+					matView->SetImg(paramValue->data(Qt::ItemDataRole::EditRole).value<cv::Mat>());
+				}
 			}
-		}
-	}, Qt::UniqueConnection);
-	connect(&view, &ParamView::sig_ParamRemoved, this, [this](QStandardItem*paramValue)
-	{
-		if (paramValue == nullptr)return;
-		if (paramValue->column() == ParamView::VALUE)
+		}, Qt::UniqueConnection);
+		connect(&view, &ParamView::sig_ParamRemoved, this, [this](QStandardItem*paramValue)
 		{
-			_watchers.remove(paramValue);
+			if (paramValue == nullptr)return;
+			if (paramValue->column() == ParamView::VALUE)
+			{
+				_watchers.remove(paramValue);
+			}
+		}, Qt::UniqueConnection);
+		connect(container.data(), &QDockWidget::destroyed, [this](QObject*obj)
+		{
+			for (auto &c : _watchers)
+				if (c == obj)
+					c.clear();
+		});
+		// 	if(_watchers.size()==0)
+		// 		addDockWidget(Qt::BottomDockWidgetArea, container.data(), Qt::Horizontal);
+		// 	else 
+		{
+			addDockWidget(Qt::DockWidgetArea::BottomDockWidgetArea, container.data(), Qt::Horizontal);
+			//splitDockWidget(container.data(),_paramWidgets[ParamView::PARAMETER],  Qt::Horizontal);
 		}
-	}, Qt::UniqueConnection);
-	connect(container.data(), &QDockWidget::destroyed, [this](QObject*obj)
-	{
-		for (auto &c : _watchers)
-			if(c==obj)
-				c.clear();
-	});
-// 	if(_watchers.size()==0)
-// 		addDockWidget(Qt::BottomDockWidgetArea, container.data(), Qt::Horizontal);
-// 	else 
-	{
-		addDockWidget(Qt::DockWidgetArea::BottomDockWidgetArea, container.data(), Qt::Horizontal);
-		//splitDockWidget(container.data(),_paramWidgets[ParamView::PARAMETER],  Qt::Horizontal);
+		_watchers.insert(item, container);
 	}
-	_watchers.insert(paramValue, container);
+	else if (QVariant(0).canConvert(type))
+	{
+		auto watcher = new NumberWatcher(this);
+		setCentralWidget(watcher);
+		connect(&view, &ParamView::sig_ParamChanged, this, [this,watcher](QStandardItem*paramValue)
+		{
+			if (paramValue == nullptr)return;
+			if (paramValue->column() == ParamView::VALUE)
+			{
+				watcher->AppendParam(paramValue->data(Qt::ItemDataRole::EditRole));
+			}
+		}, Qt::UniqueConnection);
+		connect(&view, &ParamView::sig_ParamRemoved, this, [this,watcher](QStandardItem*paramValue)
+		{
+			if (paramValue == nullptr)return;
+			if (paramValue->column() == ParamView::VALUE)
+			{
+				watcher->deleteLater();
+			}
+		}, Qt::UniqueConnection);
+	}
 }
 
 void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVariantList param, bool checked)
@@ -167,8 +200,7 @@ void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVari
 					current = i;			
 		}
 		AddParamLoader(*_paramWidgets[role]->view,
-			sender()->objectName() + ":" + param[ParamView::NAME].toString(), 
-			qobject_cast<QStandardItemModel*>(_paramWidgets[role]->view->model())->itemFromIndex(index));
+			sender()->objectName() + ":" + param[ParamView::NAME].toString());
 	}
 	else if (actionName == QStringLiteral("断开输入源"))
 	{
@@ -177,8 +209,7 @@ void FixedUI_DEMO::ParseParamAction(QString actionName, QModelIndex index, QVari
 	else if (actionName == QStringLiteral("监视"))
 	{
 		AddParamWatcher(*_paramWidgets[role]->view,
-			sender()->objectName() + ":" + param[ParamView::NAME].toString(),
-			qobject_cast<QStandardItemModel*>(_paramWidgets[role]->view->model())->itemFromIndex(index));
+			param[ParamView::NAME].toString());
 
 	}
 }
@@ -211,18 +242,15 @@ void FixedUI_DEMO::Debug()
 		case 1:
 		{
 			AddParamWatcher(*_paramWidgets[ParamView::INPUT]->view,
-				QStringLiteral("输入") + ":" + "input",
-				qobject_cast<QStandardItemModel*>(_paramWidgets[ParamView::INPUT]->view->model())->item(0, ParamView::VALUE));
+				"input");
 			AddParamWatcher(*_paramWidgets[ParamView::OUTPUT]->view,
-				QStringLiteral("输出") + ":" + "output",
-				qobject_cast<QStandardItemModel*>(_paramWidgets[ParamView::OUTPUT]->view->model())->item(0, ParamView::VALUE));
+				"output");
 		}
 		break;
 		case 2:
 		{
 			AddParamLoader(*_paramWidgets[ParamView::INPUT]->view,
-				QStringLiteral("输入") + ":" + "input",
-				qobject_cast<QStandardItemModel*>(_paramWidgets[ParamView::INPUT]->view->model())->item(0, ParamView::VALUE));
+				"input");
 		}
 		break;
 		case 3:
@@ -249,7 +277,8 @@ void FixedUI_DEMO::Debug()
 		break;
 		case 5:
 		{
-			Run();
+			AddParamWatcher(*_paramWidgets[ParamView::OUTPUT]->view,
+				"threshold");
 		}
 		break;
 		case 6:
